@@ -14,10 +14,10 @@ import numpy as np
 import networkx as nx
 import subprocess as sp
 import concurrent.futures
-try:
-    import graph_tool.all as gt
-except:
-    print("Couldn't import graphtool, spectre utils won't work")
+#try:
+#    import graph_tool.all as gt
+#except:
+#    print("Couldn't import graphtool, spectre utils won't work")
 import pygsp as pg
 import secrets
 from random import shuffle

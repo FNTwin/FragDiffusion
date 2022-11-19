@@ -1,9 +1,9 @@
 # These imports are tricky because they use c++, do not move them
 from rdkit import Chem
-try:
-    import graph_tool
-except ModuleNotFoundError:
-    pass
+#try:
+#    import graph_tool
+#except ModuleNotFoundError:
+#    pass
 
 import os
 import pathlib
@@ -19,8 +19,9 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.utilities.warnings import PossibleUserWarning
 
 from dgd import utils
-from dgd.datasets import guacamol_dataset, qm9_dataset, moses_dataset
+from dgd.datasets import guacamol_dataset, qm9_dataset#, moses_dataset
 from dgd.datasets.spectre_dataset import SBMDataModule, Comm20DataModule, PlanarDataModule, SpectreDatasetInfos
+from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos
 from dgd.metrics.abstract_metrics import TrainAbstractMetricsDiscrete, TrainAbstractMetrics
 from dgd.analysis.spectre_utils import PlanarSamplingMetrics, SBMSamplingMetrics, Comm20SamplingMetrics
 from diffusion_model import LiftedDenoisingDiffusion
@@ -116,7 +117,27 @@ def main(cfg: DictConfig):
         model_kwargs = {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
                         'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
                         'extra_features': extra_features, 'domain_features': domain_features}
+    elif dataset_config["name"] in ['frag']:
+        if dataset_config["name"] == 'frag':
+            datamodule = FragDataModule(cfg)
+            sampling_metrics = SBMSamplingMetrics(datamodule.dataloaders)
 
+        dataset_infos = FragDatasetInfos(datamodule, dataset_config)
+        train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
+        visualization_tools = NonMolecularVisualization()
+
+        if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
+            extra_features = ExtraFeatures(cfg.model.extra_features, dataset_info=dataset_infos)
+        else:
+            extra_features = DummyExtraFeatures()
+        domain_features = DummyExtraFeatures()
+
+        dataset_infos.compute_input_output_dims(datamodule=datamodule, extra_features=extra_features,
+                                                domain_features=domain_features)
+
+        model_kwargs = {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
+                        'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
+                        'extra_features': extra_features, 'domain_features': domain_features}
     elif dataset_config["name"] in ['qm9', 'guacamol', 'moses']:
         if dataset_config["name"] == 'qm9':
             datamodule = qm9_dataset.QM9DataModule(cfg)
@@ -130,11 +151,12 @@ def main(cfg: DictConfig):
             datamodule.prepare_data()
             train_smiles = None
 
-        elif dataset_config.name == 'moses':
-            datamodule = moses_dataset.MOSESDataModule(cfg)
-            dataset_infos = moses_dataset.MOSESinfos(datamodule, cfg)
-            datamodule.prepare_data()
-            train_smiles = None
+        # Moses causes some problems
+        #elif dataset_config.name == 'moses':
+        #    datamodule = moses_dataset.MOSESDataModule(cfg)
+        #    dataset_infos = moses_dataset.MOSESinfos(datamodule, cfg)
+        #    datamodule.prepare_data()
+        #    train_smiles = None
         else:
             raise ValueError("Dataset not implemented")
 
