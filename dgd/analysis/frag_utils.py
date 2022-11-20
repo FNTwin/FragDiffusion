@@ -4,6 +4,8 @@ import rdkit
 import torch
 import torch_geometric
 import pandas as pd
+import wandb
+import torch.nn as nn
 
 class FragmentEdgeToAtomEdgeConverter:
     def __init__(
@@ -59,7 +61,7 @@ def _combine_mols(mols: List[rdkit.Chem.rdchem.Mol]) -> rdkit.Chem.rdchem.Mol:
         combined_mol = Chem.CombineMols(combined_mol, mols[i])
         
     return combined_mol
-            
+
 class PyGGraphToMolConverter:
     def __init__(self, frag_idx_csv_name: str, frag_edge_idx_csv_name: str):
         frag_idx_df = pd.read_csv(frag_idx_csv_name)
@@ -84,6 +86,12 @@ class PyGGraphToMolConverter:
     ) -> rdkit.Chem.rdchem.Mol:
         frag_ids = graph.x.nonzero()[:, 1].flatten()
         edge_ids = graph.edge_attr.nonzero()[:, 1].flatten()
+
+        # Remove duplicate links
+        mask = graph.edge_index[0] > graph.edge_index[1]
+        edge_index = graph.edge_index[:, mask]
+        edge_ids = edge_ids[mask]
+
         if count_non_edge:
             # edge_id=0 indicates non-edge, so decrement edge_ids
             edge_ids -= 1
@@ -94,7 +102,7 @@ class PyGGraphToMolConverter:
         combined_mol = _combine_mols(frag_mols)
         editable_mol = Chem.EditableMol(combined_mol)
         
-        atom_bond_idxs = self._get_atom_bond_idxs(frag_ids, graph.edge_index, edge_ids)
+        atom_bond_idxs = self._get_atom_bond_idxs(frag_ids, edge_index, edge_ids)
         for atom_bond in atom_bond_idxs:
             editable_mol.AddBond(*atom_bond)
             
@@ -133,3 +141,24 @@ class PyGGraphToMolConverter:
             curr_start_idx += len(self.frag_id_to_atoms[frag_id.item()])
         
         return start_idxs
+
+
+class FragSamplingMetrics(nn.Module):
+    '''
+    Module for computing statistics between the generated graphs and test graphs
+    '''
+    def __init__(self, dataloaders, metrics_list):
+        super().__init__()
+        self.metrics_list = metrics_list
+
+    def forward(self, generated_graphs: list, name, current_epoch, val_counter, save_graphs=True, test=False):
+        '''
+        Compare generated_graphs list with test graphs
+        '''
+        if 'example_metric' in self.metrics_list:
+            print("Computing example_metric stats..")
+            # example_metric = compute_example_metric()
+            # wandb.run.summary['example_metric'] = example_metric
+
+    def reset(self):
+        pass

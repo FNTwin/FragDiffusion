@@ -25,15 +25,19 @@ class FragDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.graphs[idx]
-        n_edges = data.edge_index.shape[-1]
         n_edge_classes = data.edge_attr.shape[-1]
         y = torch.zeros([1, 0]).float()
         data.idx = idx
         n_nodes  = data.num_nodes * torch.ones(1, dtype=torch.long)
+
+        # Symmetrize
+        edge_index, edge_attr = torch_geometric.utils.to_undirected(data.edge_index, data.edge_attr,  data.num_nodes)
+        n_edges = edge_index.shape[-1]
+
         # Add edge type for "no edge"
         new_edge_attr = torch.zeros(n_edges, n_edge_classes+1, dtype=torch.float)
-        new_edge_attr[:, 1:] = data.edge_attr
-        data_out = torch_geometric.data.Data(x=data.x, edge_index=data.edge_index, edge_attr=new_edge_attr,
+        new_edge_attr[:, 1:] = edge_attr
+        data_out = torch_geometric.data.Data(x=data.x.float(), edge_index=edge_index, edge_attr=new_edge_attr,
                                          y=y, idx=idx, n_nodes=n_nodes)
         return data_out
 

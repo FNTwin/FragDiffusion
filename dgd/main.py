@@ -24,6 +24,7 @@ from dgd.datasets.spectre_dataset import SBMDataModule, Comm20DataModule, Planar
 from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos
 from dgd.metrics.abstract_metrics import TrainAbstractMetricsDiscrete, TrainAbstractMetrics
 from dgd.analysis.spectre_utils import PlanarSamplingMetrics, SBMSamplingMetrics, Comm20SamplingMetrics
+from dgd.analysis.frag_utils import FragSamplingMetrics
 from diffusion_model import LiftedDenoisingDiffusion
 from diffusion_model_discrete import DiscreteDenoisingDiffusion
 from dgd.metrics.molecular_metrics import TrainMolecularMetrics, SamplingMolecularMetrics, \
@@ -120,7 +121,7 @@ def main(cfg: DictConfig):
     elif dataset_config["name"] in ['frag']:
         if dataset_config["name"] == 'frag':
             datamodule = FragDataModule(cfg)
-            sampling_metrics = SBMSamplingMetrics(datamodule.dataloaders)
+            sampling_metrics = FragSamplingMetrics(datamodule.dataloaders)
 
         dataset_infos = FragDatasetInfos(datamodule, dataset_config)
         train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()

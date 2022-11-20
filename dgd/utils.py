@@ -160,6 +160,10 @@ def unnormalize(X, E, y, norm_values, norm_biases, node_mask, collapse=False):
 
 
 def to_dense(x, edge_index, edge_attr, batch):
+    '''
+    Convert from (N_1 + ... + N_B)xF matrix to B x N_max x F dense tensor
+    Also return node_mask of whether a node is "fake" or not
+    '''
     X, node_mask = to_dense_batch(x=x, batch=batch)
     # node_mask = node_mask.float()
     edge_index, edge_attr = torch_geometric.utils.remove_self_loops(edge_index, edge_attr)
