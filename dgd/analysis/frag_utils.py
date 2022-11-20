@@ -6,6 +6,7 @@ import torch_geometric
 import pandas as pd
 import wandb
 import torch.nn as nn
+import torch.nn.functional as f
 
 class FragmentEdgeToAtomEdgeConverter:
     def __init__(
@@ -14,7 +15,7 @@ class FragmentEdgeToAtomEdgeConverter:
         frag_edge_idx_df: pd.DataFrame
     ):
         self.frag_id_to_name = frag_id_to_name
-        
+
         self._frag_edge_to_atom_edge = {}
         for _, row in frag_edge_idx_df.iterrows():
             frag_ident = (row['fragment_index_1'], row['fragment_index_2'])
@@ -23,7 +24,7 @@ class FragmentEdgeToAtomEdgeConverter:
 
             atom_ident = (row['atom_idx_1'], row['atom_idx_2'])
             self._frag_edge_to_atom_edge[frag_ident][row['edge_id']] = atom_ident
-            
+
     def frag_edge_to_atom_edge(
         self, 
         frag_id_pair: Tuple[int, int], 
@@ -32,14 +33,14 @@ class FragmentEdgeToAtomEdgeConverter:
         frag_names = [self.frag_id_to_name[frag_id] for frag_id in frag_id_pair]
         sorted_frag_names = list(sorted(frag_names))
         swapped_order = frag_names != sorted_frag_names
-        
+
         if swapped_order:
             frag_id_pair = tuple(reversed(frag_id_pair))
-            
+
         atom_pair = self._frag_edge_to_atom_edge[frag_id_pair][edge_type]
         if swapped_order:
             atom_pair = tuple(reversed(atom_pair))
-            
+
         return atom_pair
     
 def _frag_atom_string_to_tuple(frag_atom_str: str) -> Tuple[str]:
@@ -59,10 +60,11 @@ def _combine_mols(mols: List[rdkit.Chem.rdchem.Mol]) -> rdkit.Chem.rdchem.Mol:
     combined_mol = Chem.CombineMols(mols[0], mols[1])
     for i in range(2, len(mols)):
         combined_mol = Chem.CombineMols(combined_mol, mols[i])
-        
+
     return combined_mol
 
 class PyGGraphToMolConverter:
+    # TODO: make these file paths constants
     def __init__(self, frag_idx_csv_name: str, frag_edge_idx_csv_name: str):
         frag_idx_df = pd.read_csv(frag_idx_csv_name)
         frag_edge_idx_df = pd.read_csv(frag_edge_idx_csv_name)
@@ -78,6 +80,22 @@ class PyGGraphToMolConverter:
             self.frag_id_to_name, 
             pd.read_csv(frag_edge_idx_csv_name)
         )
+
+
+    def frags_to_mol(
+        self, frag_ids:torch.tensor, edge_index:torch.tensor, edge_ids:torch.tensor
+    ) -> rdkit.Chem.rdchem.Mol:
+        frag_names = [self.frag_id_to_name[frag_id.item()] for frag_id in frag_ids]
+        frag_mols = [Chem.MolFromSmiles(smiles_str) for smiles_str in frag_names]
+
+        combined_mol = _combine_mols(frag_mols)
+        editable_mol = Chem.EditableMol(combined_mol)
+
+        atom_bond_idxs = self._get_atom_bond_idxs(frag_ids, edge_index, edge_ids)
+        for atom_bond in atom_bond_idxs:
+            editable_mol.AddBond(*atom_bond)
+
+        return editable_mol.GetMol()
 
     def graph_to_mol(
         self, 
@@ -95,19 +113,21 @@ class PyGGraphToMolConverter:
         if count_non_edge:
             # edge_id=0 indicates non-edge, so decrement edge_ids
             edge_ids -= 1
-        
-        frag_names = [self.frag_id_to_name[frag_id.item()] for frag_id in frag_ids]
-        frag_mols = [Chem.MolFromSmiles(smiles_str) for smiles_str in frag_names]
-        
-        combined_mol = _combine_mols(frag_mols)
-        editable_mol = Chem.EditableMol(combined_mol)
-        
-        atom_bond_idxs = self._get_atom_bond_idxs(frag_ids, edge_index, edge_ids)
-        for atom_bond in atom_bond_idxs:
-            editable_mol.AddBond(*atom_bond)
-            
-        return editable_mol.GetMol()
-            
+        return self.frags_to_mol(frag_ids, edge_index, edge_ids)
+
+    def node_and_adj_to_mol(self, node_list, adjacency_matrix):
+        '''
+        node_list: numpy list dimension n
+        adjacency_matrix: numpy matrix dimension n x n
+        '''
+        edge_index = adjacency_matrix.nonzero().T
+        mask = edge_index[0] > edge_index[1]
+        edge_index = edge_index[:, mask]
+        edge_ids = adjacency_matrix[edge_index.split(1,dim=0)].squeeze()
+        # Decrement edge indices because 0 indicates non-edge
+        edge_ids -= 1
+        return self.frags_to_mol(node_list, edge_index, edge_ids)
+
     def _get_atom_bond_idxs(
         self, 
         frag_ids: torch.Tensor, 

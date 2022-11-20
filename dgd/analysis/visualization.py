@@ -9,6 +9,8 @@ import networkx as nx
 import numpy as np
 import rdkit.Chem
 import wandb
+import torch
+from dgd.analysis.frag_utils import PyGGraphToMolConverter
 import matplotlib
 # matplotlib.use("macOSX")
 import matplotlib.pyplot as plt
@@ -140,7 +142,22 @@ class MolecularVisualization:
             print("Can't kekulize molecule")
         return mols
 
+class FragmentVisualization(MolecularVisualization):
+    def __init__(self, frag_idx_csv_name, frag_edge_idx_csv_name, remove_h, dataset_infos):
+        # TODO: make these file paths constants
+        self.frag_to_mol = PyGGraphToMolConverter(frag_idx_csv_name, frag_edge_idx_csv_name)
+        super().__init__(remove_h, dataset_infos)
+    
 
+    def mol_from_graphs(self, node_list, adjacency_matrix):
+        """
+        Convert graphs to rdkit molecules
+        node_list: the nodes of a batch of nodes (bs x n)
+        adjacency_matrix: the adjacency_matrix of the molecule (bs x n x n)
+        """
+        # TODO: Really shouldn't have to work with torch here
+        return self.frag_to_mol.node_and_adj_to_mol(torch.LongTensor(node_list), torch.LongTensor(adjacency_matrix))
+    
 class NonMolecularVisualization:
     def to_networkx(self, node_list, adjacency_matrix):
         """

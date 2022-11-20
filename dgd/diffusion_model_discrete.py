@@ -550,8 +550,8 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             edge_types = E[i, :n, :n].cpu()
             molecule_list.append([atom_types, edge_types])
             if i < 3:
-                print("Example of generated E: ", atom_types)
-                print("Example of generated X: ", edge_types)
+                print("Example of generated X: ", atom_types)
+                print("Example of generated E: ", edge_types)
 
         predicted_graph_list = []
         for i in range(batch_size):

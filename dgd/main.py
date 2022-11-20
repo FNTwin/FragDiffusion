@@ -21,7 +21,7 @@ from pytorch_lightning.utilities.warnings import PossibleUserWarning
 from dgd import utils
 from dgd.datasets import guacamol_dataset, qm9_dataset#, moses_dataset
 from dgd.datasets.spectre_dataset import SBMDataModule, Comm20DataModule, PlanarDataModule, SpectreDatasetInfos
-from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos
+from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos, FRAG_INDEX_FILE, FRAG_EDGE_FILE
 from dgd.metrics.abstract_metrics import TrainAbstractMetricsDiscrete, TrainAbstractMetrics
 from dgd.analysis.spectre_utils import PlanarSamplingMetrics, SBMSamplingMetrics, Comm20SamplingMetrics
 from dgd.analysis.frag_utils import FragSamplingMetrics
@@ -29,7 +29,7 @@ from diffusion_model import LiftedDenoisingDiffusion
 from diffusion_model_discrete import DiscreteDenoisingDiffusion
 from dgd.metrics.molecular_metrics import TrainMolecularMetrics, SamplingMolecularMetrics, \
     TrainMolecularMetricsDiscrete
-from dgd.analysis.visualization import MolecularVisualization, NonMolecularVisualization
+from dgd.analysis.visualization import MolecularVisualization, FragmentVisualization, NonMolecularVisualization
 from dgd.diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 from dgd.diffusion.extra_features_molecular import ExtraMolecularFeatures
 
@@ -125,6 +125,12 @@ def main(cfg: DictConfig):
 
         dataset_infos = FragDatasetInfos(datamodule, dataset_config)
         train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
+        # TODO: Improve accessing file names
+        base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, 'data')
+        frag_index_file = os.path.join(base_path, FRAG_INDEX_FILE)
+        frag_edge_file = os.path.join(base_path, FRAG_EDGE_FILE)
+        # TODO: Once FragmentVisualization is fixed, switch over
+        #visualization_tools = FragmentVisualization(frag_index_file, frag_edge_file, cfg.dataset.remove_h, dataset_infos=dataset_infos)
         visualization_tools = NonMolecularVisualization()
 
         if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
