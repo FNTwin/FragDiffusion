@@ -147,7 +147,7 @@ class FragSamplingMetrics(nn.Module):
     '''
     Module for computing statistics between the generated graphs and test graphs
     '''
-    def __init__(self, dataloaders, metrics_list):
+    def __init__(self, dataloaders, metrics_list=[]):
         super().__init__()
         self.metrics_list = metrics_list
 
