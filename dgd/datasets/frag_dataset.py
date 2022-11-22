@@ -7,7 +7,7 @@ import torch_geometric.utils
 from dgd.datasets.abstract_dataset import AbstractDataModule, AbstractDatasetInfos
 
 # TODO: Update
-FRAG_GRAPH_FILE = "frag/mol_frag_graphs.pt" 
+FRAG_GRAPH_FILE = "frag/mol_frag_graphs_10k.pt"
 FRAG_INDEX_FILE = "frag/fragment_index.csv"
 FRAG_EDGE_FILE = "frag/fragment_edge_index.csv"
 

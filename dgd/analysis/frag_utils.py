@@ -8,6 +8,12 @@ import wandb
 import torch.nn as nn
 import torch.nn.functional as f
 
+
+def padding_idx_valid(padding_idx):
+    earliest_pad = padding_idx.nonzero()[:, 1].min()
+    return padding_idx[earliest_pad:].all().item()
+
+
 class FragmentEdgeToAtomEdgeConverter:
     def __init__(
         self,
@@ -88,10 +94,14 @@ class PyGGraphToMolConverter:
     def frags_to_mol(
         self, frag_ids:torch.tensor, edge_index:torch.tensor, edge_ids:torch.tensor
     ) -> rdkit.Chem.rdchem.Mol:
-        try:
-            frag_names = [self.frag_id_to_name[frag_id.item()] for frag_id in frag_ids]
-        except:
-            import pdb; pdb.set_trace()
+        padding_idx = frag_ids == -1
+        if not padding_idx_valid(padding_idx):
+            raise ValueError(
+                'Frag IDs %s had non-consecutive padding values' % padding_idx
+            )
+
+        frag_ids = frag_ids[padding_idx]
+        frag_names = [self.frag_id_to_name[frag_id.item()] for frag_id in frag_ids]
         frag_mols = [Chem.MolFromSmiles(smiles_str) for smiles_str in frag_names]
 
         combined_mol = _combine_mols(frag_mols)

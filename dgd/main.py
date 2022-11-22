@@ -36,6 +36,9 @@ from dgd.diffusion.extra_features_molecular import ExtraMolecularFeatures
 warnings.filterwarnings("ignore", category=PossibleUserWarning)
 
 
+REPO_NAME = 'FragDiffusion'
+
+
 def get_resume(cfg, model_kwargs):
     """ Resumes a run. It loads previous config without allowing to update keys (used for testing). """
     saved_cfg = cfg.copy()
@@ -85,6 +88,15 @@ def setup_wandb(cfg):
     wandb.init(**kwargs)
     wandb.save('*.txt')
     return cfg
+
+
+def get_repo_dir():
+    cwd = pathlib.Path.cwd()
+    for parent in cwd.parents:
+        if parent.name == REPO_NAME:
+            return parent
+
+    return cwd
 
 
 def try_fit(trainer, model, datamodule, cfg):
@@ -137,12 +149,12 @@ def main(cfg: DictConfig):
         dataset_infos = FragDatasetInfos(datamodule, dataset_config)
         train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
         # TODO: Improve accessing file names
-        base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, 'data')
+        base_path = get_repo_dir() / 'data'
         frag_index_file = os.path.join(base_path, FRAG_INDEX_FILE)
         frag_edge_file = os.path.join(base_path, FRAG_EDGE_FILE)
         # TODO: Once FragmentVisualization is fixed, switch over
-        #visualization_tools = FragmentVisualization(frag_index_file, frag_edge_file, cfg.dataset.remove_h, dataset_infos=dataset_infos)
-        visualization_tools = NonMolecularVisualization()
+        visualization_tools = FragmentVisualization(frag_index_file, frag_edge_file, cfg.dataset.remove_h, dataset_infos=dataset_infos)
+        #visualization_tools = NonMolecularVisualization()
 
         if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
             extra_features = ExtraFeatures(cfg.model.extra_features, dataset_info=dataset_infos)
