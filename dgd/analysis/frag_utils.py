@@ -11,7 +11,7 @@ import torch.nn.functional as f
 class FragmentEdgeToAtomEdgeConverter:
     def __init__(
         self,
-        frag_id_to_name: Dict[int, str], 
+        frag_id_to_name: Dict[int, str],
         frag_edge_idx_df: pd.DataFrame
     ):
         self.frag_id_to_name = frag_id_to_name
@@ -26,11 +26,14 @@ class FragmentEdgeToAtomEdgeConverter:
             self._frag_edge_to_atom_edge[frag_ident][row['edge_id']] = atom_ident
 
     def frag_edge_to_atom_edge(
-        self, 
-        frag_id_pair: Tuple[int, int], 
+        self,
+        frag_id_pair: Tuple[int, int],
         edge_type: int
     ) -> Tuple[int, int]:
-        frag_names = [self.frag_id_to_name[frag_id] for frag_id in frag_id_pair]
+        frag_names = [self.frag_id_to_name.get(frag_id) for frag_id in frag_id_pair]
+        if any(map(lambda x: x is None, frag_names)):
+            return None
+
         sorted_frag_names = list(sorted(frag_names))
         swapped_order = frag_names != sorted_frag_names
 
@@ -42,14 +45,14 @@ class FragmentEdgeToAtomEdgeConverter:
             atom_pair = tuple(reversed(atom_pair))
 
         return atom_pair
-    
+
 def _frag_atom_string_to_tuple(frag_atom_str: str) -> Tuple[str]:
     # The atom string is serialized to a string like "('C', 'C', 'N')".
     # To get the tuple of strings, we need to remove the enclosing parenthesis,
 # as we do below.
     no_parenthesis_str = frag_atom_str[1:-1]
     return tuple(no_parenthesis_str.split(', '))
-    
+
 def _build_frag_id_to_atoms_dict(frag_idx_df: pd.DataFrame) -> Dict[int, Tuple[str]]:
     return {
         row['fragment_index']: _frag_atom_string_to_tuple(row['fragment_atoms'])
@@ -68,16 +71,16 @@ class PyGGraphToMolConverter:
     def __init__(self, frag_idx_csv_name: str, frag_edge_idx_csv_name: str):
         frag_idx_df = pd.read_csv(frag_idx_csv_name)
         frag_edge_idx_df = pd.read_csv(frag_edge_idx_csv_name)
-        
+
         self.frag_id_to_name = {
             row['fragment_index']: row['fragment_name']
             for _, row in frag_idx_df.iterrows()
         }
-        
+
         self.frag_id_to_atoms = _build_frag_id_to_atoms_dict(frag_idx_df)
-        
+
         self.edge_converter = FragmentEdgeToAtomEdgeConverter(
-            self.frag_id_to_name, 
+            self.frag_id_to_name,
             pd.read_csv(frag_edge_idx_csv_name)
         )
 
@@ -85,7 +88,10 @@ class PyGGraphToMolConverter:
     def frags_to_mol(
         self, frag_ids:torch.tensor, edge_index:torch.tensor, edge_ids:torch.tensor
     ) -> rdkit.Chem.rdchem.Mol:
-        frag_names = [self.frag_id_to_name[frag_id.item()] for frag_id in frag_ids]
+        try:
+            frag_names = [self.frag_id_to_name[frag_id.item()] for frag_id in frag_ids]
+        except:
+            import pdb; pdb.set_trace()
         frag_mols = [Chem.MolFromSmiles(smiles_str) for smiles_str in frag_names]
 
         combined_mol = _combine_mols(frag_mols)
@@ -98,7 +104,7 @@ class PyGGraphToMolConverter:
         return editable_mol.GetMol()
 
     def graph_to_mol(
-        self, 
+        self,
         graph: torch_geometric.data.Data,
         count_non_edge=False
     ) -> rdkit.Chem.rdchem.Mol:
@@ -129,37 +135,40 @@ class PyGGraphToMolConverter:
         return self.frags_to_mol(node_list, edge_index, edge_ids)
 
     def _get_atom_bond_idxs(
-        self, 
-        frag_ids: torch.Tensor, 
-        edge_index: torch.Tensor, 
+        self,
+        frag_ids: torch.Tensor,
+        edge_index: torch.Tensor,
         edge_ids: torch.Tensor
     ) -> List[Tuple[int]]:
         edge_index = edge_index.T
         frag_atom_start_idx = self._get_frag_atom_start_idx(frag_ids)
-        
+
         atom_bond_idxs = []
         for i in range(len(edge_index)):
             atom_edge = self.edge_converter.frag_edge_to_atom_edge(
-                tuple(frag_ids[v].item() for v in edge_index[i]), 
+                tuple(frag_ids[v].item() for v in edge_index[i]),
                 edge_ids[i].item()
             )
-            
+
+            if atom_edge is None:
+                continue
+
             mol_atom_edge = tuple(
                 frag_atom_start_idx[edge_index[i, j]] + atom_edge[j]
                 for j in range(2)
             )
-            
+
             atom_bond_idxs.append(mol_atom_edge)
-            
+
         return atom_bond_idxs
-            
+
     def _get_frag_atom_start_idx(self, frag_ids: torch.Tensor) -> List[int]:
         curr_start_idx = 0
         start_idxs = []
         for frag_id in frag_ids:
             start_idxs.append(curr_start_idx)
             curr_start_idx += len(self.frag_id_to_atoms[frag_id.item()])
-        
+
         return start_idxs
 
 

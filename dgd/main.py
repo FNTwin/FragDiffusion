@@ -87,6 +87,17 @@ def setup_wandb(cfg):
     return cfg
 
 
+def try_fit(trainer, model, datamodule, cfg):
+    try:
+        return trainer.fit(
+            model,
+            datamodule=datamodule,
+            ckpt_path=cfg.general.resume
+        )
+    except AttributeError:
+        return try_fit(trainer, model, datamodule, cfg)
+
+
 @hydra.main(version_base='1.1', config_path='../configs', config_name='config')
 def main(cfg: DictConfig):
     dataset_config = cfg["dataset"]
@@ -245,7 +256,7 @@ def main(cfg: DictConfig):
                       logger=[])
 
     if not cfg.general.test_only:
-        trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.general.resume)
+        try_fit(trainer, model, datamodule, cfg)
         if cfg.general.name not in ['debug', 'test']:
             trainer.test(model, datamodule=datamodule)
     else:
