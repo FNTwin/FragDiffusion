@@ -1,20 +1,20 @@
 # @package _global_
 general:
-    name : 'frag_overfit'
-    gpus : 1
-    wandb: 'online'
+    name : 'frag_overfit' # "test" and "debug" are reserved names: "test" will run on only 20 batches, "debug" will run 
+    gpus : 1 # multi-gpu is not enabled on this branch
+    wandb: 'online'  # online | offline | disabled
     resume: null            # If resume, path to ckpt file from outputs directory in main directory
-    test_only: null
+    test_only: null # If testing, set absolute path to ckpt file 
     check_val_every_n_epochs: 100
-    sample_every_val: 4
-    samples_to_generate: 40
-    samples_to_save: 9
-    chains_to_save: 1
+    sample_every_val: 4 # How often to generate samples
+    samples_to_generate: 40 
+    samples_to_save: 9 # Save first _ sampled graphs as pngs
+    chains_to_save: 1 # Save full generation chains as gifs and pngs
     final_model_samples_to_generate: 40
     final_model_samples_to_save: 30
     final_model_chains_to_save: 20
-    overfit: 1
-    progress_bar: false
+    overfit: 1 # Number or ratio of batches to overfit on – e.g. set to 0.01 to overfit on 1%, or set to 1 to overfit on 1 batch
+    progress_bar: false 
 train:
     n_epochs: 30000
     batch_size: 32
