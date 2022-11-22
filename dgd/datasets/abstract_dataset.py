@@ -65,7 +65,7 @@ class AbstractDataModule(pl.LightningDataModule):
             num_classes = data.edge_attr.shape[1]
             break
 
-        d = torch.Tensor(num_classes)
+        d = torch.zeros(num_classes)
 
         for split in ['train', 'val', 'test']:
             for i, data in enumerate(self.dataloaders[split]):
