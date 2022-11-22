@@ -45,7 +45,10 @@ class FragmentEdgeToAtomEdgeConverter:
 
         if swapped_order:
             frag_id_pair = tuple(reversed(frag_id_pair))
-
+        if frag_id_pair not in self._frag_edge_to_atom_edge:
+            return None
+        if edge_type not in self._frag_edge_to_atom_edge[frag_id_pair]:
+            return None
         atom_pair = self._frag_edge_to_atom_edge[frag_id_pair][edge_type]
         if swapped_order:
             atom_pair = tuple(reversed(atom_pair))
