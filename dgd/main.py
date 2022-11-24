@@ -14,21 +14,21 @@ import wandb
 import hydra
 import omegaconf
 from omegaconf import DictConfig
-from pytorch_lightning import Trainer
+from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.utilities.warnings import PossibleUserWarning
 
 from dgd import utils
-from dgd.datasets import guacamol_dataset, qm9_dataset#, moses_dataset
+from dgd.datasets import guacamol_dataset, qm9_dataset, frag_dataset#, moses_dataset
 from dgd.datasets.spectre_dataset import SBMDataModule, Comm20DataModule, PlanarDataModule, SpectreDatasetInfos
-from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos, FRAG_INDEX_FILE, FRAG_EDGE_FILE
+from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos, FRAG_INDEX_FILE, FRAG_EDGE_FILE, AtomDataModule, AtomDatasetInfos
 from dgd.metrics.abstract_metrics import TrainAbstractMetricsDiscrete, TrainAbstractMetrics
 from dgd.analysis.spectre_utils import PlanarSamplingMetrics, SBMSamplingMetrics, Comm20SamplingMetrics
 from dgd.analysis.frag_utils import FragSamplingMetrics
 from diffusion_model import LiftedDenoisingDiffusion
 from diffusion_model_discrete import DiscreteDenoisingDiffusion
 from dgd.metrics.molecular_metrics import TrainMolecularMetrics, SamplingMolecularMetrics, \
-    TrainMolecularMetricsDiscrete
+    TrainMolecularMetricsDiscrete, SamplingMolecularRDKitMetrics
 from dgd.analysis.visualization import MolecularVisualization, FragmentVisualization, NonMolecularVisualization
 from dgd.diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 from dgd.diffusion.extra_features_molecular import ExtraMolecularFeatures
@@ -114,6 +114,11 @@ def try_fit(trainer, model, datamodule, cfg):
 def main(cfg: DictConfig):
     dataset_config = cfg["dataset"]
 
+    deterministic = False
+    if 'seed' in cfg and cfg['seed'] is not None:
+        seed_everything(cfg['seed'])
+        deterministic = True
+
     if dataset_config["name"] in ['sbm', 'comm-20', 'planar']:
         if dataset_config['name'] == 'sbm':
             datamodule = SBMDataModule(cfg)
@@ -142,9 +147,7 @@ def main(cfg: DictConfig):
                         'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
                         'extra_features': extra_features, 'domain_features': domain_features}
     elif dataset_config["name"] in ['frag']:
-        if dataset_config["name"] == 'frag':
-            datamodule = FragDataModule(cfg)
-            sampling_metrics = FragSamplingMetrics(datamodule.dataloaders)
+        datamodule = FragDataModule(cfg)
 
         dataset_infos = FragDatasetInfos(datamodule, dataset_config)
         train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
@@ -165,10 +168,16 @@ def main(cfg: DictConfig):
         dataset_infos.compute_input_output_dims(datamodule=datamodule, extra_features=extra_features,
                                                 domain_features=domain_features)
 
+        sampling_metrics = SamplingMolecularRDKitMetrics(
+            dataset_infos,
+            frag_dataset.get_train_smiles(datamodule.train_dataloader()),
+            is_frag=True
+        )
+
         model_kwargs = {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
                         'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
                         'extra_features': extra_features, 'domain_features': domain_features}
-    elif dataset_config["name"] in ['qm9', 'guacamol', 'moses']:
+    elif dataset_config["name"] in ['qm9', 'guacamol', 'moses', 'frag_atom']:
         if dataset_config["name"] == 'qm9':
             datamodule = qm9_dataset.QM9DataModule(cfg)
             dataset_infos = qm9_dataset.QM9infos(datamodule=datamodule, cfg=cfg)
@@ -180,6 +189,12 @@ def main(cfg: DictConfig):
             dataset_infos = guacamol_dataset.Guacamolinfos(datamodule, cfg)
             datamodule.prepare_data()
             train_smiles = None
+
+        elif dataset_config['name'] == 'frag_atom':
+            datamodule = AtomDataModule(cfg)
+            dataset_infos = AtomDatasetInfos(datamodule, dataset_config)
+            datamodule.prepare_data()
+            train_smiles = frag_dataset.get_train_smiles(datamodule.train_dataloader())
 
         # Moses causes some problems
         #elif dataset_config.name == 'moses':
@@ -237,7 +252,7 @@ def main(cfg: DictConfig):
         checkpoint_callback = ModelCheckpoint(dirpath=f"checkpoints/{cfg.general.name}",
                                               filename='{epoch}',
                                               monitor='val/epoch_NLL',
-                                              save_top_k=5,
+                                              save_top_k=1,
                                               mode='min',
                                               every_n_epochs=1)
         callbacks.append(checkpoint_callback)
@@ -251,21 +266,27 @@ def main(cfg: DictConfig):
         print("[WARNING]: Run is called 'test' -- it will run in debug mode on 20 batches. ")
     elif name == 'debug':
         print("[WARNING]: Run is called 'debug' -- it will run with fast_dev_run. ")
-    trainer = Trainer(gradient_clip_val=cfg.train.clip_grad,
-                      accelerator='gpu' if torch.cuda.is_available() and cfg.general.gpus > 0 else 'cpu',
-                      devices=cfg.general.gpus if torch.cuda.is_available() and cfg.general.gpus > 0 else None,
-                      limit_train_batches=20 if name == 'test' else None,
-                      limit_val_batches=20 if name == 'test' else None,
-                      limit_test_batches=20 if name == 'test' else None,
-                      val_check_interval=cfg.general.val_check_interval,
-                      max_epochs=cfg.train.n_epochs,
-                      check_val_every_n_epoch=cfg.general.check_val_every_n_epochs,
-                      fast_dev_run=cfg.general.name == 'debug',
-                      strategy='ddp' if cfg.general.gpus > 1 else None,
-                      enable_progress_bar=cfg.general.progress_bar,
-                      overfit_batches=cfg.general.overfit,
-                      callbacks=callbacks,
-                      logger=[])
+    trainer = Trainer(
+        gradient_clip_val=cfg.train.clip_grad,
+
+        accelerator='gpu' if torch.cuda.is_available() and cfg.general.gpus > 0 else 'cpu',
+
+        devices=cfg.general.gpus if torch.cuda.is_available() and cfg.general.gpus > 0 else None,
+
+        limit_train_batches=20 if name == 'test' else None,
+        limit_val_batches=20 if name == 'test' else None,
+        limit_test_batches=20 if name == 'test' else None,
+        val_check_interval=cfg.general.val_check_interval,
+        max_epochs=cfg.train.n_epochs,
+        check_val_every_n_epoch=cfg.general.check_val_every_n_epochs,
+        fast_dev_run=cfg.general.name == 'debug',
+        strategy='ddp' if cfg.general.gpus > 1 else None,
+        enable_progress_bar=cfg.general.progress_bar,
+        overfit_batches=cfg.general.overfit,
+        callbacks=callbacks,
+        deterministic=deterministic,
+        logger=[]
+    )
 
     if not cfg.general.test_only:
         try_fit(trainer, model, datamodule, cfg)

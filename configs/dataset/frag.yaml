@@ -1,2 +1,2 @@
-name: 'frag'
-remove_h: null
+name: 'frag_atom'
+remove_h: true

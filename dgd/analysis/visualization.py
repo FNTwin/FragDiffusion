@@ -79,16 +79,17 @@ class MolecularVisualization:
         if num_molecules_to_visualize > len(molecules):
             print(f"Shortening to {len(molecules)}")
             num_molecules_to_visualize = len(molecules)
-        
+
         can_log=trainer is not None and hasattr(trainer,"logger") and trainer.logger is not None
         for i in range(num_molecules_to_visualize):
             file_path = os.path.join(path, 'molecule_{}.png'.format(i))
             mol = self.mol_from_graphs(molecules[i][0].numpy(), molecules[i][1].numpy())
             try:
-                Draw.MolToFile(mol, file_path)
-                if can_log:
-                    print(f"Saving {file_path} to wandb")
-                    trainer.logger.log_image(key=log, images=[file_path])
+                im = Draw.MolToImage(mol)#, file_path)
+                #print(f"Saving {file_path} to wandb")
+                wandb.log({log: [wandb.Image(im, caption=file_path)]})
+                #if can_log:
+                #    trainer.logger.log_image(key=log, images=[file_path])
             except rdkit.Chem.KekulizeException:
                 print("Can't kekulize molecule")
 
@@ -97,23 +98,7 @@ class MolecularVisualization:
         RDLogger.DisableLog('rdApp.*')
         # convert graphs to the rdkit molecules
         mols = [self.mol_from_graphs(nodes_list[i], adjacency_matrix[i]) for i in range(nodes_list.shape[0])]
-
-        # find the coordinates of atoms in the final molecule
-        final_molecule = mols[-1]
-        AllChem.Compute2DCoords(final_molecule)
-
-        coords = []
-        for i, atom in enumerate(final_molecule.GetAtoms()):
-            positions = final_molecule.GetConformer().GetAtomPosition(i)
-            coords.append((positions.x, positions.y, positions.z))
-
-        # align all the molecules
-        for i, mol in enumerate(mols):
-            AllChem.Compute2DCoords(mol)
-            conf = mol.GetConformer()
-            for j, atom in enumerate(mol.GetAtoms()):
-                x, y, z = coords[j]
-                conf.SetAtomPosition(j, Point3D(x, y, z))
+        self._align_molecules(mols)
 
         # draw gif
         save_paths = []
@@ -129,10 +114,12 @@ class MolecularVisualization:
         imgs.extend([imgs[-1]] * 10)
         imageio.mimsave(gif_path, imgs, subrectangles=True, fps=5)
 
-        can_log=trainer is not None and hasattr(trainer,"logger") and trainer.logger is not None
-        if can_log:
-            print(f"Saving {gif_path} to wandb")
-            trainer.logger.experiment.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
+        print(f"Saving {gif_path} to wandb")
+        wandb.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
+       # can_log=trainer is not None and hasattr(trainer,"logger") and trainer.logger is not None
+       # if can_log:
+       #     print(f"Saving {gif_path} to wandb")
+       #     trainer.logger.experiment.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
 
         # draw grid image
         try:
@@ -146,8 +133,16 @@ class FragmentVisualization(MolecularVisualization):
     def __init__(self, frag_idx_csv_name, frag_edge_idx_csv_name, remove_h, dataset_infos):
         # TODO: make these file paths constants
         self.frag_to_mol = PyGGraphToMolConverter(frag_idx_csv_name, frag_edge_idx_csv_name)
+        self.non_mol_viz = NonMolecularVisualization()
         super().__init__(remove_h, dataset_infos)
-    
+
+    def visualize(self, path: str, molecules: list, num_molecules_to_visualize: int, trainer=None, log='graph'):
+        super().visualize(path, molecules, num_molecules_to_visualize, trainer, log)
+        self.non_mol_viz.visualize(path, molecules, num_molecules_to_visualize, 'fragment_%s' % log, trainer)
+
+    def visualize_chain(self, path, nodes_list, adjacency_matrix, trainer=None):
+        super().visualize_chain(path, nodes_list, adjacency_matrix, trainer)
+        self.non_mol_viz.visualize_chain(path, nodes_list, adjacency_matrix, trainer, 'fragment')
 
     def mol_from_graphs(self, node_list, adjacency_matrix):
         """
@@ -157,7 +152,10 @@ class FragmentVisualization(MolecularVisualization):
         """
         # TODO: Really shouldn't have to work with torch here
         return self.frag_to_mol.node_and_adj_to_mol(torch.LongTensor(node_list), torch.LongTensor(adjacency_matrix))
-    
+
+    def _align_molecules(self, mols):
+        pass
+
 class NonMolecularVisualization:
     def to_networkx(self, node_list, adjacency_matrix):
         """
@@ -218,7 +216,25 @@ class NonMolecularVisualization:
             im = plt.imread(file_path)
             wandb.log({log: [wandb.Image(im, caption=file_path)]})
 
-    def visualize_chain(self, path, nodes_list, adjacency_matrix, trainer=None):
+    def _align_molecules(self, mols):
+        # find the coordinates of atoms in the final molecule
+        final_molecule = mols[-1]
+        AllChem.Compute2DCoords(final_molecule)
+
+        coords = []
+        for i, atom in enumerate(final_molecule.GetAtoms()):
+            positions = final_molecule.GetConformer().GetAtomPosition(i)
+            coords.append((positions.x, positions.y, positions.z))
+
+        # align all the molecules
+        for i, mol in enumerate(mols):
+            AllChem.Compute2DCoords(mol)
+            conf = mol.GetConformer()
+            for j, atom in enumerate(mol.GetAtoms()):
+                x, y, z = coords[j]
+                conf.SetAtomPosition(j, Point3D(x, y, z))
+
+    def visualize_chain(self, path, nodes_list, adjacency_matrix, trainer=None, wandb_prefix=''):
         # convert graphs to networkx
         graphs = [self.to_networkx(nodes_list[i], adjacency_matrix[i]) for i in range(nodes_list.shape[0])]
         # find the coordinates of atoms in the final molecule
@@ -238,5 +254,9 @@ class NonMolecularVisualization:
         gif_path = os.path.join(os.path.dirname(path), '{}.gif'.format(path.split('/')[-1]))
         imgs.extend([imgs[-1]] * 10)
         imageio.mimsave(gif_path, imgs, subrectangles=True, fps=5)
-        wandb.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
+
+        if wandb_prefix and wandb_prefix[-1] != '_':
+            wandb_prefix += '_'
+
+        wandb.log({'%schain' % wandb_prefix: [wandb.Video(gif_path, caption=gif_path, format="gif")]})
         return

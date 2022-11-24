@@ -1,4 +1,7 @@
+from pathlib import Path
 import os
+import pandas as pd
+import numpy as np
 
 import torch
 from torch.utils.data import random_split, Dataset
@@ -7,9 +10,13 @@ import torch_geometric.utils
 from dgd.datasets.abstract_dataset import AbstractDataModule, AbstractDatasetInfos
 
 # TODO: Update
-FRAG_GRAPH_FILE = "frag/mol_frag_graphs_10k.pt"
+FRAG_GRAPH_FILE = "frag/mol_frag_graphs_100000.pt"
+ATOM_GRAPH_FILE = "frag/atom_graphs_100000.pt"
+ATOM_DECODER_FILE = "frag/atom_decoder.csv"
+SMILES_FILE = "frag/valid_smiles_100000.txt"
 FRAG_INDEX_FILE = "frag/fragment_index.csv"
 FRAG_EDGE_FILE = "frag/fragment_edge_index.csv"
+SPLIT_IDX_FILE = "frag/split_idxs.npz"
 
 
 class FragDataset(Dataset):
@@ -42,6 +49,14 @@ class FragDataset(Dataset):
         return data_out
 
 
+class AtomDataset(FragDataset):
+    def __getitem__(self, idx):
+        data = self.graphs[idx]
+        data.idx = idx
+
+        return data
+
+
 class FragDataModule(AbstractDataModule):
     def __init__(self, cfg):
         super().__init__(cfg)
@@ -58,11 +73,54 @@ class FragDataModule(AbstractDataModule):
         train_len = int(round((len(graphs) - test_len) * 0.8))
         val_len = len(graphs) - train_len - test_len
         print(f'Dataset sizes: train {train_len}, val {val_len}, test {test_len}')
-        splits = random_split(graphs, [train_len, val_len, test_len], generator=torch.Generator().manual_seed(1234))
+        splits = random_split(
+            graphs,
+            [train_len, val_len, test_len],
+            generator=torch.Generator().manual_seed(1234)
+        )
 
         datasets = {'train': splits[0], 'val': splits[1], 'test': splits[2]}
+        split_idxs = {
+            '%s_idxs' % key: np.array([x.idx for x in val])
+            for key, val in datasets.items()
+        }
+
+        cwd = Path.cwd()
+        print('Saving split indices to %s' % cwd)
+        np.savez(cwd / 'split_idxs', **split_idxs)
+
         super().prepare_data(datasets)
 
+
+class AtomDataModule(AbstractDataModule):
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.file_name = ATOM_GRAPH_FILE
+        self.prepare_data()
+        self.inner = self.train_dataloader()
+
+    def __getitem__(self, item):
+        return self.inner[item]
+
+    def prepare_data(self):
+        graphs = AtomDataset(self.file_name)
+
+        base_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            os.pardir,
+            os.pardir,
+            'data'
+        )
+
+        filename = os.path.join(base_path, SPLIT_IDX_FILE)
+        split_idxs = np.load(filename)
+
+        datasets = {
+            key: [graphs[i] for i in split_idxs['%s_idxs' % key]]
+            for key in ['train', 'val', 'test']
+        }
+
+        super().prepare_data(datasets)
 
 class FragDatasetInfos(AbstractDatasetInfos):
     def __init__(self, datamodule, dataset_config):
@@ -73,3 +131,43 @@ class FragDatasetInfos(AbstractDatasetInfos):
         self.edge_types = self.datamodule.edge_counts()
         super().complete_infos(self.n_nodes, self.node_types)
 
+
+class AtomDatasetInfos(FragDatasetInfos):
+    def __init__(self, datamodule, dataset_config):
+        base_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            os.pardir,
+            os.pardir,
+            'data'
+        )
+
+        filename = os.path.join(base_path, ATOM_DECODER_FILE)
+
+        self.atom_decoder = {
+            row['index']: row['atom_name']
+            for _, row in pd.read_csv(filename).iterrows()
+        }
+
+        super().__init__(datamodule, dataset_config)
+
+
+def get_train_smiles(train_dataloader):
+    base_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        os.pardir,
+        os.pardir,
+        'data'
+    )
+
+    filename = os.path.join(base_path, SMILES_FILE)
+    with open(filename, 'r') as f:
+        smiles_with_endline = f.readlines()
+
+    all_smiles = [smiles.replace('\n', '') for smiles in smiles_with_endline]
+    nested_idxs = [data['idx'] for data in train_dataloader]
+    if torch.is_tensor(nested_idxs[0]):
+        train_idxs = torch.cat(nested_idxs).tolist()
+    else:
+        train_idxs = [x for idxs in nested_idxs for x in idxs]
+
+    return [all_smiles[idx] for idx in train_idxs]

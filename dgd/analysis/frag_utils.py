@@ -10,8 +10,13 @@ import torch.nn.functional as f
 
 
 def padding_idx_valid(padding_idx):
-    earliest_pad = padding_idx.nonzero()[:, 1].min()
-    return padding_idx[earliest_pad:].all().item()
+    if padding_idx.all():
+        return True
+
+    inv_padding = ~padding_idx
+
+    earliest_pad = inv_padding.nonzero().min()
+    return inv_padding[earliest_pad:].all().item()
 
 
 class FragmentEdgeToAtomEdgeConverter:
@@ -97,7 +102,7 @@ class PyGGraphToMolConverter:
     def frags_to_mol(
         self, frag_ids:torch.tensor, edge_index:torch.tensor, edge_ids:torch.tensor
     ) -> rdkit.Chem.rdchem.Mol:
-        padding_idx = frag_ids == -1
+        padding_idx = frag_ids != -1
         if not padding_idx_valid(padding_idx):
             raise ValueError(
                 'Frag IDs %s had non-consecutive padding values' % padding_idx
@@ -158,6 +163,9 @@ class PyGGraphToMolConverter:
 
         atom_bond_idxs = []
         for i in range(len(edge_index)):
+            if any(map(lambda x: x.item() >= len(frag_ids), edge_index[i])):
+                continue
+
             atom_edge = self.edge_converter.frag_edge_to_atom_edge(
                 tuple(frag_ids[v].item() for v in edge_index[i]),
                 edge_ids[i].item()

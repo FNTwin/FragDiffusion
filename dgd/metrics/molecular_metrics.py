@@ -52,6 +52,39 @@ class TrainMolecularMetrics(nn.Module):
         print(f"Epoch {current_epoch}: {epoch_atom_metrics} -- {epoch_bond_metrics}")
 
 
+class SamplingMolecularRDKitMetrics(nn.Module):
+    def __init__(self, dataset_infos, train_smiles, is_frag=False):
+        super().__init__()
+        self.dataset_info = dataset_infos
+        self.train_smiles = train_smiles
+        self.is_frag = is_frag
+
+    def forward(self, molecules: list, name, current_epoch, val_counter, test=False):
+        stability, rdkit_metrics, all_smiles = compute_molecular_metrics(
+            molecules,
+            self.train_smiles,
+            self.dataset_info,
+            check_stability=False,
+            is_frag=self.is_frag
+        )
+
+        if test:
+            with open(r'final_smiles.txt', 'w') as fp:
+                for smiles in all_smiles:
+                    # write each item on a new line
+                    fp.write("%s\n" % smiles)
+                print('All smiles saved')
+
+        valid_unique_molecules = rdkit_metrics[1]
+        textfile = open(f'graphs/{name}/valid_unique_molecules_e{current_epoch}_b{val_counter}.txt', "w")
+        textfile.writelines(valid_unique_molecules)
+        textfile.close()
+        print("Stability metrics:", stability, "--", rdkit_metrics[0])
+
+    def reset(self):
+        pass
+
+
 class SamplingMolecularMetrics(nn.Module):
     def __init__(self, dataset_infos, train_smiles):
         super().__init__()
@@ -74,14 +107,14 @@ class SamplingMolecularMetrics(nn.Module):
         edge_target_dist = edge_target_dist / torch.sum(edge_target_dist)
         self.register_buffer('edge_target_dist', edge_target_dist)
 
-        valency_target_dist = di.valency_distribution.type_as(self.generated_valency_dist.edgepernode_dist)
-        valency_target_dist = valency_target_dist / torch.sum(valency_target_dist)
-        self.register_buffer('valency_target_dist', valency_target_dist)
+        #valency_target_dist = di.valency_distribution.type_as(self.generated_valency_dist.edgepernode_dist)
+        #valency_target_dist = valency_target_dist / torch.sum(valency_target_dist)
+        #self.register_buffer('valency_target_dist', valency_target_dist)
 
         self.n_dist_mae = HistogramsMAE(n_target_dist)
         self.node_dist_mae = HistogramsMAE(node_target_dist)
         self.edge_dist_mae = HistogramsMAE(edge_target_dist)
-        self.valency_dist_mae = HistogramsMAE(valency_target_dist)
+        #self.valency_dist_mae = HistogramsMAE(valency_target_dist)
 
         self.train_smiles = train_smiles
         self.dataset_info = di
@@ -108,38 +141,37 @@ class SamplingMolecularMetrics(nn.Module):
         generated_edge_dist = self.generated_edge_dist.compute()
         self.edge_dist_mae(generated_edge_dist)
 
-        self.generated_valency_dist(molecules)
-        generated_valency_dist = self.generated_valency_dist.compute()
-        self.valency_dist_mae(generated_valency_dist)
+        #self.generated_valency_dist(molecules)
+        #generated_valency_dist = self.generated_valency_dist.compute()
+        #self.valency_dist_mae(generated_valency_dist)
 
         to_log = {}
-        for i, atom_type in enumerate(self.dataset_info.atom_decoder):
-            generated_probability = generated_node_dist[i]
-            target_probability = self.node_target_dist[i]
-            to_log[f'molecular_metrics/{atom_type}_dist'] = (generated_probability - target_probability).item()
+        #for i, atom_type in enumerate(self.dataset_info.atom_decoder):
+        #    generated_probability = generated_node_dist[i]
+        #    target_probability = self.node_target_dist[i]
+        #    to_log[f'molecular_metrics/{atom_type}_dist'] = (generated_probability - target_probability).item()
 
-        for j, bond_type in enumerate(['No bond', 'Single', 'Double', 'Triple', 'Aromatic']):
-            generated_probability = generated_edge_dist[j]
-            target_probability = self.edge_target_dist[j]
+        #for j, bond_type in enumerate(['No bond', 'Single', 'Double', 'Triple', 'Aromatic']):
+        #    generated_probability = generated_edge_dist[j]
+        #    target_probability = self.edge_target_dist[j]
 
-            to_log[f'molecular_metrics/bond_{bond_type}_dist'] = (generated_probability - target_probability).item()
+        #    to_log[f'molecular_metrics/bond_{bond_type}_dist'] = (generated_probability - target_probability).item()
 
-        for valency in range(6):
-            generated_probability = generated_valency_dist[valency]
-            target_probability = self.valency_target_dist[valency]
-            to_log[f'molecular_metrics/valency_{valency}_dist'] = (generated_probability - target_probability).item()
+        #for valency in range(6):
+        #    generated_probability = generated_valency_dist[valency]
+        #    target_probability = self.valency_target_dist[valency]
+        #    to_log[f'molecular_metrics/valency_{valency}_dist'] = (generated_probability - target_probability).item()
 
         wandb.log(to_log, commit=False)
 
-        wandb.run.summary['Gen n distribution'] = generated_n_dist
-        wandb.run.summary['Gen node distribution'] = generated_node_dist
-        wandb.run.summary['Gen edge distribution'] = generated_edge_dist
-        wandb.run.summary['Gen valency distribution'] = generated_valency_dist
+        #wandb.run.summary['Gen n distribution'] = generated_n_dist
+        #wandb.run.summary['Gen node distribution'] = generated_node_dist
+        #wandb.run.summary['Gen edge distribution'] = generated_edge_dist
+        #wandb.run.summary['Gen valency distribution'] = generated_valency_dist
 
         wandb.log({'basic_metrics/n_mae': self.n_dist_mae.compute(),
                    'basic_metrics/node_mae': self.node_dist_mae.compute(),
-                   'basic_metrics/edge_mae': self.edge_dist_mae.compute(),
-                   'basic_metrics/valency_mae': self.valency_dist_mae.compute()}, commit=False)
+                   'basic_metrics/edge_mae': self.edge_dist_mae.compute(),}, commit=False)# 'basic_metrics/valency_mae': self.valency_dist_mae.compute()
 
         valid_unique_molecules = rdkit_metrics[1]
         textfile = open(f'graphs/{name}/valid_unique_molecules_e{current_epoch}_b{val_counter}.txt', "w")
@@ -148,7 +180,7 @@ class SamplingMolecularMetrics(nn.Module):
         print("Stability metrics:", stability, "--", rdkit_metrics[0])
 
     def reset(self):
-        for metric in [self.n_dist_mae, self.node_dist_mae, self.edge_dist_mae, self.valency_dist_mae]:
+        for metric in [self.n_dist_mae, self.node_dist_mae, self.edge_dist_mae]:#, self.valency_dist_mae]:
             metric.reset()
 
 
@@ -536,16 +568,16 @@ class BondMetricsCE(MetricCollection):
 class TrainMolecularMetricsDiscrete(nn.Module):
     def __init__(self, dataset_infos):
         super().__init__()
-        self.train_atom_metrics = AtomMetricsCE(dataset_infos=dataset_infos)
+        #self.train_atom_metrics = AtomMetricsCE(dataset_infos=dataset_infos)
         self.train_bond_metrics = BondMetricsCE()
 
     def forward(self, masked_pred_X, masked_pred_E, true_X, true_E, log: bool):
-        self.train_atom_metrics(masked_pred_X, true_X)
+        #self.train_atom_metrics(masked_pred_X, true_X)
         self.train_bond_metrics(masked_pred_E, true_E)
         if log:
             to_log = {}
-            for key, val in self.train_atom_metrics.compute().items():
-                to_log['train/' + key] = val.item()
+            #for key, val in self.train_atom_metrics.compute().items():
+            #    to_log['train/' + key] = val.item()
             for key, val in self.train_bond_metrics.compute().items():
                 to_log['train/' + key] = val.item()
 
