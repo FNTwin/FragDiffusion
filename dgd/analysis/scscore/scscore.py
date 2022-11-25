@@ -16,6 +16,7 @@ import pickle
 
 import os
 project_root = os.path.dirname(os.path.dirname(__file__))
+SCSCORE_MODEL_FILE = os.path.join(project_root, 'scscore', 'model.ckpt-10654.as_numpy.pickle')
 
 score_scale = 5.0
 min_separation = 0.25
@@ -31,6 +32,7 @@ class SCScorer():
         self.vars = []
         self.score_scale = score_scale
         self._restored = False
+        self.restore(SCSCORE_MODEL_FILE)
 
     def restore(self, weight_path=os.path.join(project_root, 'models', 'full_reaxys_model_1024bool', 'model.ckpt-10654.as_numpy.pickle'), FP_rad=FP_rad, FP_len=FP_len):
         self.FP_len = FP_len; self.FP_rad = FP_rad
@@ -95,36 +97,12 @@ class SCScorer():
         return (smi, cur_score)
 
     def _load_vars(self, weight_path):
-        if weight_path.endswith('pickle'):
-
-            with open(weight_path, 'rb') as fid:
-                self.vars = pickle.load(fid, encoding="latin1")
-                self.vars = [x.tolist() for x in self.vars]
-        elif weight_path.endswith('json.gz'):
-            with gzip.GzipFile(weight_path, 'r') as fin:    # 4. gzip
-                json_bytes = fin.read()                      # 3. bytes (i.e. UTF-8)
-                json_str = json_bytes.decode('utf-8')            # 2. string (i.e. JSON)
-                self.vars = json.loads(json_str)
-                self.vars = [np.array(x) for x in self.vars]
-
+        with open(weight_path, 'rb') as fid:
+            self.vars = pickle.load(fid, encoding="latin1")
+            self.vars = [x.tolist() for x in self.vars]
 
 if __name__ == '__main__':
     model = SCScorer()
-    model.restore(os.path.join(project_root, 'models', 'full_reaxys_model_1024bool', 'model.ckpt-10654.as_numpy.json.gz'))
-    smis = ['CCCOCCC', 'CCCNc1ccccc1']
-    for smi in smis:
-        (smi, sco) = model.get_score_from_smi(smi)
-        print('%.4f <--- %s' % (sco, smi))
-
-    model = SCScorer()
-    model.restore(os.path.join(project_root, 'models', 'full_reaxys_model_2048bool', 'model.ckpt-10654.as_numpy.json.gz'), FP_len=2048)
-    smis = ['CCCOCCC', 'CCCNc1ccccc1']
-    for smi in smis:
-        (smi, sco) = model.get_score_from_smi(smi)
-        print('%.4f <--- %s' % (sco, smi))
-
-    model = SCScorer()
-    model.restore(os.path.join(project_root, 'models', 'full_reaxys_model_1024uint8', 'model.ckpt-10654.as_numpy.json.gz'))
     smis = ['CCCOCCC', 'CCCNc1ccccc1']
     for smi in smis:
         (smi, sco) = model.get_score_from_smi(smi)

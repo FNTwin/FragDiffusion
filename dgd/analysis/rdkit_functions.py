@@ -46,9 +46,6 @@ class BasicMolecularMetrics(object):
     def __init__(self, dataset_info, train_smiles=None, is_frag=False):
         self.dataset_info = dataset_info
         self.sc_scorer = SCScorer()
-        base_path = get_repo_dir() / 'dgd' / 'analysis'
-        scorer_file = base_path / 'scscore' / 'model.ckpt-10654.as_numpy.pickle'
-        self.sc_scorer.restore(scorer_file)
 
         self.atom_decoder = None
         if self.dataset_info is not None:
