@@ -124,11 +124,10 @@ class AtomDataModule(AbstractDataModule):
 
 class FragDatasetInfos(AbstractDatasetInfos):
     def __init__(self, datamodule, dataset_config):
-        self.datamodule = datamodule
         self.name = 'nx_graphs'
-        self.n_nodes = self.datamodule.node_counts()
+        self.n_nodes = datamodule.node_counts()
         self.node_types = datamodule.node_types()
-        self.edge_types = self.datamodule.edge_counts()
+        self.edge_types = datamodule.edge_counts()
         super().complete_infos(self.n_nodes, self.node_types)
 
 
@@ -147,6 +146,8 @@ class AtomDatasetInfos(FragDatasetInfos):
             row['index']: row['atom_name']
             for _, row in pd.read_csv(filename).iterrows()
         }
+
+        self.remove_h = dataset_config.remove_h
 
         super().__init__(datamodule, dataset_config)
 

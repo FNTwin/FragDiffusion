@@ -129,6 +129,24 @@ class MolecularVisualization:
             print("Can't kekulize molecule")
         return mols
 
+    def _align_molecules(self, mols):
+        # find the coordinates of atoms in the final molecule
+        final_molecule = mols[-1]
+        AllChem.Compute2DCoords(final_molecule)
+
+        coords = []
+        for i, atom in enumerate(final_molecule.GetAtoms()):
+            positions = final_molecule.GetConformer().GetAtomPosition(i)
+            coords.append((positions.x, positions.y, positions.z))
+
+        # align all the molecules
+        for i, mol in enumerate(mols):
+            AllChem.Compute2DCoords(mol)
+            conf = mol.GetConformer()
+            for j, atom in enumerate(mol.GetAtoms()):
+                x, y, z = coords[j]
+                conf.SetAtomPosition(j, Point3D(x, y, z))
+
 class FragmentVisualization(MolecularVisualization):
     def __init__(self, frag_idx_csv_name, frag_edge_idx_csv_name, remove_h, dataset_infos):
         # TODO: make these file paths constants

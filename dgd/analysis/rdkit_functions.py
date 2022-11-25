@@ -350,10 +350,10 @@ def check_stability(atom_types, edge_types, dataset_info, debug=False,atom_decod
     return molecule_stable, n_stable_bonds, len(atom_types)
 
 
-def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, trainer=None, check_stability=True, is_frag=False):
+def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, trainer=None, should_check_stability=True, is_frag=False):
     """ molecule_list: (dict) """
 
-    if hasattr(dataset_info, 'remove_h') and not dataset_info.remove_h and check_stability:
+    if hasattr(dataset_info, 'remove_h') and not dataset_info.remove_h and should_check_stability:
         print(f'Analyzing molecule stability...')
 
         molecule_stable = 0

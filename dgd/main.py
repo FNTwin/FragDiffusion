@@ -106,18 +106,19 @@ def try_fit(trainer, model, datamodule, cfg):
             datamodule=datamodule,
             ckpt_path=cfg.general.resume
         )
-    except AttributeError:
-        return try_fit(trainer, model, datamodule, cfg)
+    except AttributeError as e:
+        if len(e.args) >= 1 and e.args[0] == '_old_init':
+            return try_fit(trainer, model, datamodule, cfg)
+        else:
+            raise e
 
 
 @hydra.main(version_base='1.1', config_path='../configs', config_name='config')
 def main(cfg: DictConfig):
     dataset_config = cfg["dataset"]
 
-    deterministic = False
-    if 'seed' in cfg and cfg['seed'] is not None:
-        seed_everything(cfg['seed'])
-        deterministic = True
+    if 'seed' in cfg.general and cfg.general.seed is not None:
+        seed_everything(cfg.general.seed)
 
     if dataset_config["name"] in ['sbm', 'comm-20', 'planar']:
         if dataset_config['name'] == 'sbm':
@@ -268,11 +269,8 @@ def main(cfg: DictConfig):
         print("[WARNING]: Run is called 'debug' -- it will run with fast_dev_run. ")
     trainer = Trainer(
         gradient_clip_val=cfg.train.clip_grad,
-
         accelerator='gpu' if torch.cuda.is_available() and cfg.general.gpus > 0 else 'cpu',
-
         devices=cfg.general.gpus if torch.cuda.is_available() and cfg.general.gpus > 0 else None,
-
         limit_train_batches=20 if name == 'test' else None,
         limit_val_batches=20 if name == 'test' else None,
         limit_test_batches=20 if name == 'test' else None,
@@ -284,7 +282,6 @@ def main(cfg: DictConfig):
         enable_progress_bar=cfg.general.progress_bar,
         overfit_batches=cfg.general.overfit,
         callbacks=callbacks,
-        deterministic=deterministic,
         logger=[]
     )
 
