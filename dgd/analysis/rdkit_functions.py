@@ -1,13 +1,21 @@
 from dgd.datasets.frag_dataset import FRAG_INDEX_FILE, FRAG_EDGE_FILE
 from dgd.analysis.frag_utils import PyGGraphToMolConverter
+from dgd.analysis.scscore.scscore import SCScorer
+
 from pathlib import Path
 import numpy as np
 import torch
 import re
 import wandb
+import os
+import sys
 try:
     from rdkit import Chem
     from rdkit.Chem import Descriptors as ChemDescriptors
+    from rdkit.Chem import RDConfig
+
+    sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+    import sascorer
     print("Found rdkit, all good")
 except ModuleNotFoundError as e:
     use_rdkit = False
@@ -37,6 +45,7 @@ def get_repo_dir():
 class BasicMolecularMetrics(object):
     def __init__(self, dataset_info, train_smiles=None, is_frag=False):
         self.dataset_info = dataset_info
+        self.sc_scorer = SCScorer()
 
         self.atom_decoder = None
         if self.dataset_info is not None:
@@ -122,6 +131,34 @@ class BasicMolecularMetrics(object):
 
         return qed_sum / len(generated)
 
+    def compute_sa_score(self, valid, generated):
+        '''
+        Synthetic Accessibility 
+        '''
+        mols = map(Chem.MolFromSmiles, valid)
+        filtered_mols = filter(lambda x: x is not None, mols)
+        sa_score_sum = 0.0
+        for mol in filtered_mols:
+            try:
+                sa_score_sum += sascorer.calculateScore(mol)
+            except:
+                continue
+
+        return sa_score_sum / len(generated)
+    
+    def compute_sc_score(self, valid, generated):
+        '''
+        Synthetic Complexity
+        '''
+        sc_score_sum = 0.0
+        for smi in valid:
+            try:
+                sc_score_sum += self.sc_scorer.get_score_from_smi(smi)
+            except:
+                continue
+
+        return sc_score_sum / len(generated)
+        
     def compute_relaxed_validity(self, generated, frag_converter=None):
         valid = []
         for graph in generated:
@@ -158,6 +195,8 @@ class BasicMolecularMetrics(object):
             print(f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%")
             logp = self.compute_logp(valid, generated)
             qed = self.compute_qed(valid, generated)
+            sascore = self.compute_sa_score(valid, generated)
+            scscore = self.compute_sc_score(valid, generated)
 
             if self.dataset_smiles_list is not None:
                 _, novelty = self.compute_novelty(unique)
@@ -170,7 +209,7 @@ class BasicMolecularMetrics(object):
             logp = 0.0
             qed = 0.0
             unique = []
-        return [validity, relaxed_validity, uniqueness, novelty, logp, qed], unique,\
+        return [validity, relaxed_validity, uniqueness, novelty, logp, qed, sascore, scscore], unique,\
                dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu), all_smiles
 
 
@@ -384,7 +423,8 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, trainer
     all_smiles = rdkit_metrics[-1]
     log_dict = {'Validity': rdkit_metrics[0][0], 'Relaxed Validity': rdkit_metrics[0][1],
                 'Uniqueness': rdkit_metrics[0][2], 'Novelty': rdkit_metrics[0][3],
-                'LogP': rdkit_metrics[0][4], 'QED': rdkit_metrics[0][5]}
+                'LogP': rdkit_metrics[0][4], 'QED': rdkit_metrics[0][5],
+                'SA_Score': rdkit_metrics[0][6], 'SCScore': rdkit_metric[0][7]}
 
     log_dict = {'samples/%s' % key: val for key, val in log_dict.items()}
 
