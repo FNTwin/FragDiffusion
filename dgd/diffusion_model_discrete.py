@@ -133,6 +133,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         self.start_epoch_time = time.time()
         self.train_loss.reset()
         self.train_metrics.reset()
+        wandb.log({"epoch": self.current_epoch}, commit=False)
 
     def on_train_epoch_end(self) -> None:
         self.train_loss.log_epoch_metrics(self.current_epoch, self.start_epoch_time)
