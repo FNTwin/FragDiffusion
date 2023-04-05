@@ -4,8 +4,12 @@ from rdkit import Chem
 #    import graph_tool
 #except ModuleNotFoundError:
 #    pass
-
+import sys
 import os
+current = os.path.dirname(os.path.realpath(__file__))
+parent_directory = os.path.dirname(current)
+sys.path.append(parent_directory)
+
 import pathlib
 import warnings
 
@@ -83,7 +87,7 @@ def get_resume_adaptive(cfg, model_kwargs):
 
 def setup_wandb(cfg):
     config_dict = omegaconf.OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    kwargs = {'name': cfg.general.name, 'project': f'graph_ddm_{cfg.dataset.name}', 'config': config_dict,
+    kwargs = {'entity': cfg.general.entity, 'name': cfg.general.name, 'project': f'graph_ddm_{cfg.dataset.name}', 'config': config_dict,
               'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': cfg.general.wandb}
     wandb.init(**kwargs)
     wandb.save('*.txt')

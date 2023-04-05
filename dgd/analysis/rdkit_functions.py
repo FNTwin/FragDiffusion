@@ -424,7 +424,7 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, trainer
     log_dict = {'Validity': rdkit_metrics[0][0], 'Relaxed Validity': rdkit_metrics[0][1],
                 'Uniqueness': rdkit_metrics[0][2], 'Novelty': rdkit_metrics[0][3],
                 'LogP': rdkit_metrics[0][4], 'QED': rdkit_metrics[0][5],
-                'SA_Score': rdkit_metrics[0][6], 'SCScore': rdkit_metric[0][7]}
+                'SA_Score': rdkit_metrics[0][6], 'SCScore': rdkit_metrics[0][7]}
 
     log_dict = {'samples/%s' % key: val for key, val in log_dict.items()}
 

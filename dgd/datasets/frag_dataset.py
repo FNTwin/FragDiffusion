@@ -10,10 +10,10 @@ import torch_geometric.utils
 from dgd.datasets.abstract_dataset import AbstractDataModule, AbstractDatasetInfos
 
 # TODO: Update
-FRAG_GRAPH_FILE = "frag/mol_frag_graphs_100000.pt"
+FRAG_GRAPH_FILE = "zinc/mol_frag_graphs_250k_300_5.pt"
 ATOM_GRAPH_FILE = "frag/atom_graphs_100000.pt"
 ATOM_DECODER_FILE = "frag/atom_decoder.csv"
-SMILES_FILE = "frag/valid_smiles_100000.txt"
+SMILES_FILE = "frag/valid_smiles_250k.txt"
 FRAG_INDEX_FILE = "frag/fragment_index.csv"
 FRAG_EDGE_FILE = "frag/fragment_edge_index.csv"
 SPLIT_IDX_FILE = "frag/split_idxs.npz"
