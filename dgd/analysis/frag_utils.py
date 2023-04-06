@@ -150,6 +150,8 @@ class PyGGraphToMolConverter:
         edge_ids = adjacency_matrix[edge_index.split(1,dim=0)].squeeze()
         # Decrement edge indices because 0 indicates non-edge
         edge_ids -= 1
+        if len(edge_ids.shape) == 0:
+            edge_ids = edge_ids.unsqueeze(0)
         return self.frags_to_mol(node_list, edge_index, edge_ids)
 
     def _get_atom_bond_idxs(

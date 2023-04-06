@@ -80,7 +80,7 @@ class SCScorer():
 
     def get_score_from_smi(self, smi='', v=False):
         if not smi:
-            return ('', 0.)
+            return 0.
         fp = np.array((self.smi_to_fp(smi)), dtype=np.float32)
         if sum(fp) == 0:
             if v: print('Could not get fingerprint?')
@@ -94,7 +94,7 @@ class SCScorer():
             smi = Chem.MolToSmiles(mol, isomericSmiles=True, kekuleSmiles=True)
         else:
             smi = ''
-        return (smi, cur_score)
+        return  cur_score
 
     def _load_vars(self, weight_path):
         with open(weight_path, 'rb') as fid:
@@ -105,5 +105,5 @@ if __name__ == '__main__':
     model = SCScorer()
     smis = ['CCCOCCC', 'CCCNc1ccccc1']
     for smi in smis:
-        (smi, sco) = model.get_score_from_smi(smi)
+        sco  =  model.get_score_from_smi(smi)
         print('%.4f <--- %s' % (sco, smi))
