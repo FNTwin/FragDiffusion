@@ -256,9 +256,9 @@ def main(cfg: DictConfig):
     if cfg.train.save_model:
         checkpoint_callback = ModelCheckpoint(dirpath=f"checkpoints/{cfg.general.name}",
                                               filename='{epoch}',
-                                              monitor='val/epoch_NLL',
+                                              monitor='val/X_logp',
                                               save_top_k=1,
-                                              mode='min',
+                                              mode='max',
                                               every_n_epochs=1)
         callbacks.append(checkpoint_callback)
 
