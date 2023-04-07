@@ -174,12 +174,12 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
               f"Val Edge type KL: {metrics[2] :.2f} -- Val Global feat. KL {metrics[3] :.2f}\n")
 
         # Log val nll with default Lightning logger, so it can be monitored by checkpoint callback
-        val_nll = metrics[0]
-        self.log("val/epoch_NLL", val_nll)
+        val_log_p = metrics[-3]
+        self.log("val/X_logp", val_log_p)
 
-        if val_nll < self.best_val_nll:
-            self.best_val_nll = val_nll
-        print('Val loss: %.4f \t Best val loss:  %.4f\n' % (val_nll, self.best_val_nll))
+        #if val_nll < self.best_val_nll:
+        #    self.best_val_nll = val_nll
+        #print('Val loss: %.4f \t Best val loss:  %.4f\n' % (val_nll, self.best_val_nll))
 
         self.val_counter += 1
         if self.val_counter % self.cfg.general.sample_every_val == 0:
