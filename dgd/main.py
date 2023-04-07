@@ -17,7 +17,7 @@ import torch
 import wandb
 import hydra
 import omegaconf
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.utilities.warnings import PossibleUserWarning
@@ -119,6 +119,8 @@ def try_fit(trainer, model, datamodule, cfg):
 
 @hydra.main(version_base='1.1', config_path='../configs', config_name='config')
 def main(cfg: DictConfig):
+    print("Config:")
+    print(OmegaConf.to_yaml(cfg))
     dataset_config = cfg["dataset"]
 
     if 'seed' in cfg.general and cfg.general.seed is not None:

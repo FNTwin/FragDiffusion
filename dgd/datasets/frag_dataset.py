@@ -11,8 +11,8 @@ from dgd.datasets.abstract_dataset import AbstractDataModule, AbstractDatasetInf
 
 # TODO: Update
 FRAG_GRAPH_FILE = "zinc/mol_frag_graphs_250k_300_5.pt"
-ATOM_GRAPH_FILE = "frag/atom_graphs_100000.pt"
-ATOM_DECODER_FILE = "frag/atom_decoder.csv"
+ATOM_GRAPH_FILE = "zinc/atom_graphs_250k_300_5.pt" #"frag/atom_graphs_100000.pt"
+ATOM_DECODER_FILE = "frag/atom_decoder_250k.csv" #"frag/atom_decoder.csv"
 SMILES_FILE = "frag/valid_smiles_250k.txt"
 FRAG_INDEX_FILE = "frag/fragment_index.csv"
 FRAG_EDGE_FILE = "frag/fragment_edge_index.csv"
@@ -146,9 +146,11 @@ class AtomDatasetInfos(FragDatasetInfos):
             row['index']: row['atom_name']
             for _, row in pd.read_csv(filename).iterrows()
         }
-
+        self.valencies =  [1, 4, 1, 1, 1, 3, 2, 2]
         self.remove_h = dataset_config.remove_h
+        self.max_weight = 1000
 
+        self.atom_weights = {0: 79.9, 1: 12, 2: 35.45, 3: 19, 4: 126.9, 5: 14, 6: 16, 7: 32.06}
         super().__init__(datamodule, dataset_config)
 
 

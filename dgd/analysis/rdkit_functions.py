@@ -209,6 +209,8 @@ class BasicMolecularMetrics(object):
             logp = 0.0
             qed = 0.0
             unique = []
+            sascore = 0.0
+            scscore = 0.0
         return [validity, relaxed_validity, uniqueness, novelty, logp, qed, sascore, scscore], unique,\
                dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu), all_smiles
 
