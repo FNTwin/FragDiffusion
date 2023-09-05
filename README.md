@@ -50,3 +50,25 @@ of datasets that are currently available
   year={2022}
 }
 ```
+
+
+## Current problems 
+- Validity of molecules is wrong, most of them are plain wrong (probably not checking if a bond change the n of allowed bonds of an atom) -> Fixed
+- No 3D
+- Really bad way to add bond 
+- No frag dataset -> IN PROGRESS, ZINC preprocessing 
+- One hot embedding -> Change to nn.Embedding
+- Clean a lil the API and allows to load the model more easily
+
+## TODO
+- Understanding this code
+- Replacing the codebook of fragments with edge prediction and including 3D (see papers)
+- Rework the dataset class for the frag dataset
+
+## Models
+
+| Model  | Config  | Checkpoint  | Regr Conditional  | 
+|---|---|---|---|
+| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | 
+|   |   |   |   |
+|   |   |   |   |

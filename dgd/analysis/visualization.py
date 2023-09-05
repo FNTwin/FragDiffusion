@@ -12,11 +12,9 @@ import wandb
 import torch
 from dgd.analysis.frag_utils import PyGGraphToMolConverter
 import matplotlib
+
 # matplotlib.use("macOSX")
 import matplotlib.pyplot as plt
-
-
-
 
 
 class MolecularVisualization:
@@ -69,7 +67,14 @@ class MolecularVisualization:
             mol = None
         return mol
 
-    def visualize(self, path: str, molecules: list, num_molecules_to_visualize: int, trainer=None, log='graph'):
+    def visualize(
+        self,
+        path: str,
+        molecules: list,
+        num_molecules_to_visualize: int,
+        trainer=None,
+        log="graph",
+    ):
         # define path to save figures
         if not os.path.exists(path):
             os.makedirs(path)
@@ -80,24 +85,30 @@ class MolecularVisualization:
             print(f"Shortening to {len(molecules)}")
             num_molecules_to_visualize = len(molecules)
 
-        can_log=trainer is not None and hasattr(trainer,"logger") and trainer.logger is not None
+        can_log = (
+            trainer is not None
+            and hasattr(trainer, "logger")
+            and trainer.logger is not None
+        )
         for i in range(num_molecules_to_visualize):
-            file_path = os.path.join(path, 'molecule_{}.png'.format(i))
+            file_path = os.path.join(path, "molecule_{}.png".format(i))
             mol = self.mol_from_graphs(molecules[i][0].numpy(), molecules[i][1].numpy())
             try:
-                im = Draw.MolToImage(mol)#, file_path)
-                #print(f"Saving {file_path} to wandb")
+                im = Draw.MolToImage(mol)  # , file_path)
+                # print(f"Saving {file_path} to wandb")
                 wandb.log({log: [wandb.Image(im, caption=file_path)]})
-                #if can_log:
+                # if can_log:
                 #    trainer.logger.log_image(key=log, images=[file_path])
             except rdkit.Chem.KekulizeException:
                 print("Can't kekulize molecule")
 
-
     def visualize_chain(self, path, nodes_list, adjacency_matrix, trainer=None):
-        RDLogger.DisableLog('rdApp.*')
+        RDLogger.DisableLog("rdApp.*")
         # convert graphs to the rdkit molecules
-        mols = [self.mol_from_graphs(nodes_list[i], adjacency_matrix[i]) for i in range(nodes_list.shape[0])]
+        mols = [
+            self.mol_from_graphs(nodes_list[i], adjacency_matrix[i])
+            for i in range(nodes_list.shape[0])
+        ]
         self._align_molecules(mols)
 
         # draw gif
@@ -105,26 +116,32 @@ class MolecularVisualization:
         num_frams = nodes_list.shape[0]
 
         for frame in range(num_frams):
-            file_name = os.path.join(path, 'fram_{}.png'.format(frame))
-            Draw.MolToFile(mols[frame], file_name, size=(300, 300), legend=f"Frame {frame}")
+            file_name = os.path.join(path, "fram_{}.png".format(frame))
+            Draw.MolToFile(
+                mols[frame], file_name, size=(300, 300), legend=f"Frame {frame}"
+            )
             save_paths.append(file_name)
 
         imgs = [imageio.imread(fn) for fn in save_paths]
-        gif_path = os.path.join(os.path.dirname(path), '{}.gif'.format(path.split('/')[-1]))
+        gif_path = os.path.join(
+            os.path.dirname(path), "{}.gif".format(path.split("/")[-1])
+        )
         imgs.extend([imgs[-1]] * 10)
-        imageio.mimsave(gif_path, imgs, subrectangles=True, duration=int(1000* 1 / 5))
+        imageio.mimsave(gif_path, imgs, subrectangles=True, duration=int(1000 * 1 / 5))
 
         print(f"Saving {gif_path} to wandb")
-        wandb.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
-       # can_log=trainer is not None and hasattr(trainer,"logger") and trainer.logger is not None
-       # if can_log:
-       #     print(f"Saving {gif_path} to wandb")
-       #     trainer.logger.experiment.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
+        wandb.log({"chain": [wandb.Video(gif_path, caption=gif_path, format="gif")]})
+        # can_log=trainer is not None and hasattr(trainer,"logger") and trainer.logger is not None
+        # if can_log:
+        #     print(f"Saving {gif_path} to wandb")
+        #     trainer.logger.experiment.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
 
         # draw grid image
         try:
             img = Draw.MolsToGridImage(mols, molsPerRow=10, subImgSize=(200, 200))
-            img.save(os.path.join(path, '{}_grid_image.png'.format(path.split('/')[-1])))
+            img.save(
+                os.path.join(path, "{}_grid_image.png".format(path.split("/")[-1]))
+            )
         except Chem.rdchem.KekulizeException:
             print("Can't kekulize molecule")
         return mols
@@ -147,20 +164,37 @@ class MolecularVisualization:
                 x, y, z = coords[j]
                 conf.SetAtomPosition(j, Point3D(x, y, z))
 
+
 class FragmentVisualization(MolecularVisualization):
-    def __init__(self, frag_idx_csv_name, frag_edge_idx_csv_name, remove_h, dataset_infos):
+    def __init__(
+        self, frag_idx_csv_name, frag_edge_idx_csv_name, remove_h, dataset_infos
+    ):
         # TODO: make these file paths constants
-        self.frag_to_mol = PyGGraphToMolConverter(frag_idx_csv_name, frag_edge_idx_csv_name)
+        # TODO: FIND WHY THIS ISN'T WORKING
+        self.frag_to_mol = PyGGraphToMolConverter(
+            frag_idx_csv_name, frag_edge_idx_csv_name
+        )
         self.non_mol_viz = NonMolecularVisualization()
         super().__init__(remove_h, dataset_infos)
 
-    def visualize(self, path: str, molecules: list, num_molecules_to_visualize: int, trainer=None, log='graph'):
+    def visualize(
+        self,
+        path: str,
+        molecules: list,
+        num_molecules_to_visualize: int,
+        trainer=None,
+        log="graph",
+    ):
         super().visualize(path, molecules, num_molecules_to_visualize, trainer, log)
-        self.non_mol_viz.visualize(path, molecules, num_molecules_to_visualize, 'fragment_%s' % log, trainer)
+        self.non_mol_viz.visualize(
+            path, molecules, num_molecules_to_visualize, "fragment_%s" % log, trainer
+        )
 
     def visualize_chain(self, path, nodes_list, adjacency_matrix, trainer=None):
         super().visualize_chain(path, nodes_list, adjacency_matrix, trainer)
-        self.non_mol_viz.visualize_chain(path, nodes_list, adjacency_matrix, trainer, 'fragment')
+        self.non_mol_viz.visualize_chain(
+            path, nodes_list, adjacency_matrix, trainer, "fragment"
+        )
 
     def mol_from_graphs(self, node_list, adjacency_matrix):
         """
@@ -169,10 +203,13 @@ class FragmentVisualization(MolecularVisualization):
         adjacency_matrix: the adjacency_matrix of the molecule (bs x n x n)
         """
         # TODO: Really shouldn't have to work with torch here
-        return self.frag_to_mol.node_and_adj_to_mol(torch.LongTensor(node_list), torch.LongTensor(adjacency_matrix))
+        return self.frag_to_mol.node_and_adj_to_mol(
+            torch.LongTensor(node_list), torch.LongTensor(adjacency_matrix)
+        )
 
     def _align_molecules(self, mols):
         pass
+
 
 class NonMolecularVisualization:
     def to_networkx(self, node_list, adjacency_matrix):
@@ -192,11 +229,15 @@ class NonMolecularVisualization:
         edges = zip(rows.tolist(), cols.tolist())
         for edge in edges:
             edge_type = adjacency_matrix[edge[0]][edge[1]]
-            graph.add_edge(edge[0], edge[1], color=float(edge_type), weight=3 * edge_type)
+            graph.add_edge(
+                edge[0], edge[1], color=float(edge_type), weight=3 * edge_type
+            )
 
         return graph
 
-    def visualize_non_molecule(self, graph, pos, path, iterations=100, node_size=100, largest_component=False):
+    def visualize_non_molecule(
+        self, graph, pos, path, iterations=100, node_size=100, largest_component=False
+    ):
         if largest_component:
             CGs = [graph.subgraph(c) for c in nx.connected_components(graph)]
             CGs = sorted(CGs, key=lambda x: x.number_of_nodes(), reverse=True)
@@ -213,14 +254,31 @@ class NonMolecularVisualization:
         vmin, vmax = -m, m
 
         plt.figure()
-        nx.draw(graph, pos, font_size=5, node_size=node_size, with_labels=False, node_color=U[:, 1],
-                cmap=plt.cm.coolwarm, vmin=vmin, vmax=vmax, edge_color='grey')
+        nx.draw(
+            graph,
+            pos,
+            font_size=5,
+            node_size=node_size,
+            with_labels=False,
+            node_color=U[:, 1],
+            cmap=plt.cm.coolwarm,
+            vmin=vmin,
+            vmax=vmax,
+            edge_color="grey",
+        )
 
         plt.tight_layout()
         plt.savefig(path)
         plt.close("all")
 
-    def visualize(self, path: str, graphs: list, num_graphs_to_visualize: int, log='graph', trainer=None):
+    def visualize(
+        self,
+        path: str,
+        graphs: list,
+        num_graphs_to_visualize: int,
+        log="graph",
+        trainer=None,
+    ):
         # TODO: implement the multi-gpu case
         # define path to save figures
         if not os.path.exists(path):
@@ -228,7 +286,7 @@ class NonMolecularVisualization:
 
         # visualize the final molecules
         for i in range(num_graphs_to_visualize):
-            file_path = os.path.join(path, 'graph_{}.png'.format(i))
+            file_path = os.path.join(path, "graph_{}.png".format(i))
             graph = self.to_networkx(graphs[i][0].numpy(), graphs[i][1].numpy())
             self.visualize_non_molecule(graph=graph, pos=None, path=file_path)
             im = plt.imread(file_path)
@@ -252,9 +310,14 @@ class NonMolecularVisualization:
                 x, y, z = coords[j]
                 conf.SetAtomPosition(j, Point3D(x, y, z))
 
-    def visualize_chain(self, path, nodes_list, adjacency_matrix, trainer=None, wandb_prefix=''):
+    def visualize_chain(
+        self, path, nodes_list, adjacency_matrix, trainer=None, wandb_prefix=""
+    ):
         # convert graphs to networkx
-        graphs = [self.to_networkx(nodes_list[i], adjacency_matrix[i]) for i in range(nodes_list.shape[0])]
+        graphs = [
+            self.to_networkx(nodes_list[i], adjacency_matrix[i])
+            for i in range(nodes_list.shape[0])
+        ]
         # find the coordinates of atoms in the final molecule
         final_graph = graphs[-1]
         final_pos = nx.spring_layout(final_graph, seed=0)
@@ -264,17 +327,26 @@ class NonMolecularVisualization:
         num_frams = nodes_list.shape[0]
 
         for frame in range(num_frams):
-            file_name = os.path.join(path, 'fram_{}.png'.format(frame))
-            self.visualize_non_molecule(graph=graphs[frame], pos=final_pos, path=file_name)
+            file_name = os.path.join(path, "fram_{}.png".format(frame))
+            self.visualize_non_molecule(
+                graph=graphs[frame], pos=final_pos, path=file_name
+            )
             save_paths.append(file_name)
 
         imgs = [imageio.imread(fn) for fn in save_paths]
-        gif_path = os.path.join(os.path.dirname(path), '{}.gif'.format(path.split('/')[-1]))
+        gif_path = os.path.join(
+            os.path.dirname(path), "{}.gif".format(path.split("/")[-1])
+        )
         imgs.extend([imgs[-1]] * 10)
-        imageio.mimsave(gif_path, imgs, subrectangles=True, duration=int(1000* 1 / 5))
+        imageio.mimsave(gif_path, imgs, subrectangles=True, duration=int(1000 * 1 / 5))
 
-        if wandb_prefix and wandb_prefix[-1] != '_':
-            wandb_prefix += '_'
+        if wandb_prefix and wandb_prefix[-1] != "_":
+            wandb_prefix += "_"
 
-        wandb.log({'%schain' % wandb_prefix: [wandb.Video(gif_path, caption=gif_path, format="gif")]})
+        wandb.log(
+            {
+                "%schain"
+                % wandb_prefix: [wandb.Video(gif_path, caption=gif_path, format="gif")]
+            }
+        )
         return

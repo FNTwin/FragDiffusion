@@ -1,11 +1,13 @@
 # These imports are tricky because they use c++, do not move them
 from rdkit import Chem
-#try:
+
+# try:
 #    import graph_tool
-#except ModuleNotFoundError:
+# except ModuleNotFoundError:
 #    pass
 import sys
 import os
+
 current = os.path.dirname(os.path.realpath(__file__))
 parent_directory = os.path.dirname(current)
 sys.path.append(parent_directory)
@@ -23,32 +25,59 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.utilities.warnings import PossibleUserWarning
 
 from dgd import utils
-from dgd.datasets import guacamol_dataset, qm9_dataset, frag_dataset#, moses_dataset
-from dgd.datasets.spectre_dataset import SBMDataModule, Comm20DataModule, PlanarDataModule, SpectreDatasetInfos
-from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos, FRAG_INDEX_FILE, FRAG_EDGE_FILE, AtomDataModule, AtomDatasetInfos
-from dgd.metrics.abstract_metrics import TrainAbstractMetricsDiscrete, TrainAbstractMetrics
-from dgd.analysis.spectre_utils import PlanarSamplingMetrics, SBMSamplingMetrics, Comm20SamplingMetrics
+from dgd.datasets import guacamol_dataset, qm9_dataset, frag_dataset  # , moses_dataset
+from dgd.datasets.spectre_dataset import (
+    SBMDataModule,
+    Comm20DataModule,
+    PlanarDataModule,
+    SpectreDatasetInfos,
+)
+from dgd.datasets.frag_dataset import (
+    FragDataModule,
+    FragDatasetInfos,
+    FRAG_INDEX_FILE,
+    FRAG_EDGE_FILE,
+    AtomDataModule,
+    AtomDatasetInfos,
+)
+from dgd.metrics.abstract_metrics import (
+    TrainAbstractMetricsDiscrete,
+    TrainAbstractMetrics,
+)
+from dgd.analysis.spectre_utils import (
+    PlanarSamplingMetrics,
+    SBMSamplingMetrics,
+    Comm20SamplingMetrics,
+)
 from dgd.analysis.frag_utils import FragSamplingMetrics
 from diffusion_model import LiftedDenoisingDiffusion
 from diffusion_model_discrete import DiscreteDenoisingDiffusion
-from dgd.metrics.molecular_metrics import TrainMolecularMetrics, SamplingMolecularMetrics, \
-    TrainMolecularMetricsDiscrete, SamplingMolecularRDKitMetrics
-from dgd.analysis.visualization import MolecularVisualization, FragmentVisualization, NonMolecularVisualization
+from dgd.metrics.molecular_metrics import (
+    TrainMolecularMetrics,
+    SamplingMolecularMetrics,
+    TrainMolecularMetricsDiscrete,
+    SamplingMolecularRDKitMetrics,
+)
+from dgd.analysis.visualization import (
+    MolecularVisualization,
+    FragmentVisualization,
+    NonMolecularVisualization,
+)
 from dgd.diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 from dgd.diffusion.extra_features_molecular import ExtraMolecularFeatures
 
 warnings.filterwarnings("ignore", category=PossibleUserWarning)
 
 
-REPO_NAME = 'FragDiffusion'
+REPO_NAME = "FragDiffusion"
 
 
 def get_resume(cfg, model_kwargs):
-    """ Resumes a run. It loads previous config without allowing to update keys (used for testing). """
+    """Resumes a run. It loads previous config without allowing to update keys (used for testing)."""
     saved_cfg = cfg.copy()
-    name = cfg.general.name + '_resume'
+    name = cfg.general.name + "_resume"
     resume = cfg.general.test_only
-    if cfg.model.type == 'discrete':
+    if cfg.model.type == "discrete":
         model = DiscreteDenoisingDiffusion.load_from_checkpoint(resume, **model_kwargs)
     else:
         model = LiftedDenoisingDiffusion.load_from_checkpoint(resume, **model_kwargs)
@@ -60,18 +89,22 @@ def get_resume(cfg, model_kwargs):
 
 
 def get_resume_adaptive(cfg, model_kwargs):
-    """ Resumes a run. It loads previous config but allows to make some changes (used for resuming training)."""
+    """Resumes a run. It loads previous config but allows to make some changes (used for resuming training)."""
     saved_cfg = cfg.copy()
     # Fetch path to this file to get base path
     current_path = os.path.dirname(os.path.realpath(__file__))
-    root_dir = current_path.split('outputs')[0]
+    root_dir = current_path.split("outputs")[0]
 
     resume_path = os.path.join(root_dir, cfg.general.resume)
 
-    if cfg.model.type == 'discrete':
-        model = DiscreteDenoisingDiffusion.load_from_checkpoint(resume_path, **model_kwargs)
+    if cfg.model.type == "discrete":
+        model = DiscreteDenoisingDiffusion.load_from_checkpoint(
+            resume_path, **model_kwargs
+        )
     else:
-        model = LiftedDenoisingDiffusion.load_from_checkpoint(resume_path, **model_kwargs)
+        model = LiftedDenoisingDiffusion.load_from_checkpoint(
+            resume_path, **model_kwargs
+        )
     new_cfg = model.cfg
 
     for category in cfg:
@@ -79,19 +112,27 @@ def get_resume_adaptive(cfg, model_kwargs):
             new_cfg[category][arg] = cfg[category][arg]
 
     new_cfg.general.resume = resume_path
-    new_cfg.general.name = new_cfg.general.name + '_resume'
+    new_cfg.general.name = new_cfg.general.name + "_resume"
 
     new_cfg = cfg.update_config_with_new_keys(new_cfg, saved_cfg)
     return new_cfg, model
 
 
 def setup_wandb(cfg):
-    config_dict = omegaconf.OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    kwargs = {'entity': "fntwin",
-               'name': cfg.general.name, 'project': f'SAFE_SPACE', 'config': config_dict,
-              'settings': wandb.Settings(_disable_stats=False), 'reinit': True, 'mode': cfg.general.wandb}
+    config_dict = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+    kwargs = {
+        "entity": "fntwin",
+        "name": cfg.general.name,
+        "project": f"SAFE_SPACE",
+        "config": config_dict,
+        "settings": wandb.Settings(_disable_stats=False),
+        "reinit": True,
+        "mode": cfg.general.wandb,
+    }
     wandb.init(**kwargs)
-    wandb.save('*.txt')
+    wandb.save("*.txt")
     return cfg
 
 
@@ -106,32 +147,28 @@ def get_repo_dir():
 
 def try_fit(trainer, model, datamodule, cfg):
     try:
-        return trainer.fit(
-            model,
-            datamodule=datamodule,
-            ckpt_path=cfg.general.resume
-        )
+        return trainer.fit(model, datamodule=datamodule, ckpt_path=cfg.general.resume)
     except AttributeError as e:
-        if len(e.args) >= 1 and e.args[0] == '_old_init':
+        if len(e.args) >= 1 and e.args[0] == "_old_init":
             return try_fit(trainer, model, datamodule, cfg)
         else:
             raise e
 
 
-@hydra.main(version_base='1.1', config_path='../configs', config_name='config')
+@hydra.main(version_base="1.1", config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
     print("Config:")
     print(OmegaConf.to_yaml(cfg))
     dataset_config = cfg["dataset"]
 
-    if 'seed' in cfg.general and cfg.general.seed is not None:
+    if "seed" in cfg.general and cfg.general.seed is not None:
         seed_everything(cfg.general.seed)
 
-    if dataset_config["name"] in ['sbm', 'comm-20', 'planar']:
-        if dataset_config['name'] == 'sbm':
+    if dataset_config["name"] in ["sbm", "comm-20", "planar"]:
+        if dataset_config["name"] == "sbm":
             datamodule = SBMDataModule(cfg)
             sampling_metrics = SBMSamplingMetrics(datamodule.dataloaders)
-        elif dataset_config['name'] == 'comm-20':
+        elif dataset_config["name"] == "comm-20":
             datamodule = Comm20DataModule(cfg)
             sampling_metrics = Comm20SamplingMetrics(datamodule.dataloaders)
         else:
@@ -139,73 +176,110 @@ def main(cfg: DictConfig):
             sampling_metrics = PlanarSamplingMetrics(datamodule.dataloaders)
 
         dataset_infos = SpectreDatasetInfos(datamodule, dataset_config)
-        train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
+        train_metrics = (
+            TrainAbstractMetricsDiscrete()
+            if cfg.model.type == "discrete"
+            else TrainAbstractMetrics()
+        )
         visualization_tools = NonMolecularVisualization()
 
-        if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
-            extra_features = ExtraFeatures(cfg.model.extra_features, dataset_info=dataset_infos)
+        if cfg.model.type == "discrete" and cfg.model.extra_features is not None:
+            extra_features = ExtraFeatures(
+                cfg.model.extra_features, dataset_info=dataset_infos
+            )
         else:
             extra_features = DummyExtraFeatures()
         domain_features = DummyExtraFeatures()
 
-        dataset_infos.compute_input_output_dims(datamodule=datamodule, extra_features=extra_features,
-                                                domain_features=domain_features)
+        dataset_infos.compute_input_output_dims(
+            datamodule=datamodule,
+            extra_features=extra_features,
+            domain_features=domain_features,
+        )
 
-        model_kwargs = {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
-                        'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
-                        'extra_features': extra_features, 'domain_features': domain_features}
-    elif dataset_config["name"] in ['frag']:
+        model_kwargs = {
+            "dataset_infos": dataset_infos,
+            "train_metrics": train_metrics,
+            "sampling_metrics": sampling_metrics,
+            "visualization_tools": visualization_tools,
+            "extra_features": extra_features,
+            "domain_features": domain_features,
+        }
+    elif dataset_config["name"] in ["frag"]:
         datamodule = FragDataModule(cfg)
 
         dataset_infos = FragDatasetInfos(datamodule, dataset_config)
-        train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
+        train_metrics = (
+            TrainAbstractMetricsDiscrete()
+            if cfg.model.type == "discrete"
+            else TrainAbstractMetrics()
+        )
         # TODO: Improve accessing file names
-        base_path = get_repo_dir() / 'data'
+        base_path = get_repo_dir() / "data"
         frag_index_file = os.path.join(base_path, FRAG_INDEX_FILE)
         frag_edge_file = os.path.join(base_path, FRAG_EDGE_FILE)
         # TODO: Once FragmentVisualization is fixed, switch over
-        visualization_tools = FragmentVisualization(frag_index_file, frag_edge_file, cfg.dataset.remove_h, dataset_infos=dataset_infos)
-        #visualization_tools = NonMolecularVisualization()
+        visualization_tools = FragmentVisualization(
+            frag_index_file,
+            frag_edge_file,
+            cfg.dataset.remove_h,
+            dataset_infos=dataset_infos,
+        )
+        # visualization_tools = NonMolecularVisualization()
 
-        if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
-            extra_features = ExtraFeatures(cfg.model.extra_features, dataset_info=dataset_infos)
+        if cfg.model.type == "discrete" and cfg.model.extra_features is not None:
+            extra_features = ExtraFeatures(
+                cfg.model.extra_features, dataset_info=dataset_infos
+            )
         else:
             extra_features = DummyExtraFeatures()
         domain_features = DummyExtraFeatures()
 
-        dataset_infos.compute_input_output_dims(datamodule=datamodule, extra_features=extra_features,
-                                                domain_features=domain_features)
+        dataset_infos.compute_input_output_dims(
+            datamodule=datamodule,
+            extra_features=extra_features,
+            domain_features=domain_features,
+        )
 
         sampling_metrics = SamplingMolecularRDKitMetrics(
             dataset_infos,
             frag_dataset.get_train_smiles(datamodule.train_dataloader()),
-            is_frag=True
+            is_frag=True,
         )
 
-        model_kwargs = {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
-                        'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
-                        'extra_features': extra_features, 'domain_features': domain_features}
-    elif dataset_config["name"] in ['qm9', 'guacamol', 'moses', 'frag_atom']:
-        if dataset_config["name"] == 'qm9':
+        model_kwargs = {
+            "dataset_infos": dataset_infos,
+            "train_metrics": train_metrics,
+            "sampling_metrics": sampling_metrics,
+            "visualization_tools": visualization_tools,
+            "extra_features": extra_features,
+            "domain_features": domain_features,
+        }
+    elif dataset_config["name"] in ["qm9", "guacamol", "moses", "frag_atom"]:
+        if dataset_config["name"] == "qm9":
             datamodule = qm9_dataset.QM9DataModule(cfg)
             dataset_infos = qm9_dataset.QM9infos(datamodule=datamodule, cfg=cfg)
             datamodule.prepare_data()
-            train_smiles = qm9_dataset.get_train_smiles(cfg=cfg, train_dataloader=datamodule.train_dataloader(),
-                                                        dataset_infos=dataset_infos, evaluate_dataset=False)
-        elif dataset_config['name'] == 'guacamol':
+            train_smiles = qm9_dataset.get_train_smiles(
+                cfg=cfg,
+                train_dataloader=datamodule.train_dataloader(),
+                dataset_infos=dataset_infos,
+                evaluate_dataset=False,
+            )
+        elif dataset_config["name"] == "guacamol":
             datamodule = guacamol_dataset.GuacamolDataModule(cfg)
             dataset_infos = guacamol_dataset.Guacamolinfos(datamodule, cfg)
             datamodule.prepare_data()
             train_smiles = None
 
-        elif dataset_config['name'] == 'frag_atom':
+        elif dataset_config["name"] == "frag_atom":
             datamodule = AtomDataModule(cfg)
             dataset_infos = AtomDatasetInfos(datamodule, dataset_config)
             datamodule.prepare_data()
             train_smiles = frag_dataset.get_train_smiles(datamodule.train_dataloader())
 
         # Moses causes some problems
-        #elif dataset_config.name == 'moses':
+        # elif dataset_config.name == 'moses':
         #    datamodule = moses_dataset.MOSESDataModule(cfg)
         #    dataset_infos = moses_dataset.MOSESinfos(datamodule, cfg)
         #    datamodule.prepare_data()
@@ -213,88 +287,108 @@ def main(cfg: DictConfig):
         else:
             raise ValueError("Dataset not implemented")
 
-        if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
-            extra_features = ExtraFeatures(cfg.model.extra_features, dataset_info=dataset_infos)
+        if cfg.model.type == "discrete" and cfg.model.extra_features is not None:
+            extra_features = ExtraFeatures(
+                cfg.model.extra_features, dataset_info=dataset_infos
+            )
             domain_features = ExtraMolecularFeatures(dataset_infos=dataset_infos)
         else:
             extra_features = DummyExtraFeatures()
             domain_features = DummyExtraFeatures()
 
-        dataset_infos.compute_input_output_dims(datamodule=datamodule, extra_features=extra_features,
-                                                domain_features=domain_features)
+        dataset_infos.compute_input_output_dims(
+            datamodule=datamodule,
+            extra_features=extra_features,
+            domain_features=domain_features,
+        )
 
-        if cfg.model.type == 'discrete':
+        if cfg.model.type == "discrete":
             train_metrics = TrainMolecularMetricsDiscrete(dataset_infos)
         else:
             train_metrics = TrainMolecularMetrics(dataset_infos)
 
         # We do not evaluate novelty during training
         sampling_metrics = SamplingMolecularMetrics(dataset_infos, train_smiles)
-        visualization_tools = MolecularVisualization(cfg.dataset.remove_h, dataset_infos=dataset_infos)
+        visualization_tools = MolecularVisualization(
+            cfg.dataset.remove_h, dataset_infos=dataset_infos
+        )
 
-        model_kwargs = {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
-                        'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
-                        'extra_features': extra_features, 'domain_features': domain_features}
+        model_kwargs = {
+            "dataset_infos": dataset_infos,
+            "train_metrics": train_metrics,
+            "sampling_metrics": sampling_metrics,
+            "visualization_tools": visualization_tools,
+            "extra_features": extra_features,
+            "domain_features": domain_features,
+        }
     else:
         raise NotImplementedError("Unknown dataset {}".format(cfg["dataset"]))
 
     if cfg.general.test_only:
         # When testing, previous configuration is fully loaded
         cfg, _ = get_resume(cfg, model_kwargs)
-        os.chdir(cfg.general.test_only.split('checkpoints')[0])
+        os.chdir(cfg.general.test_only.split("checkpoints")[0])
     elif cfg.general.resume is not None:
         # When resuming, we can override some parts of previous configuration
         cfg, _ = get_resume_adaptive(cfg, model_kwargs)
-        os.chdir(cfg.general.resume.split('checkpoints')[0])
+        os.chdir(cfg.general.resume.split("checkpoints")[0])
 
     utils.create_folders(cfg)
     cfg = setup_wandb(cfg)
 
-    if cfg.model.type == 'discrete':
+    if cfg.model.type == "discrete":
         model = DiscreteDenoisingDiffusion(cfg=cfg, **model_kwargs)
     else:
         model = LiftedDenoisingDiffusion(cfg=cfg, **model_kwargs)
 
     callbacks = []
     if cfg.train.save_model:
-        checkpoint_callback = ModelCheckpoint(dirpath=f"checkpoints/{cfg.general.name}",
-                                              filename='{epoch}',
-                                              monitor='val/X_logp',
-                                              save_top_k=1,
-                                              mode='max',
-                                              every_n_epochs=1)
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=f"checkpoints/{cfg.general.name}",
+            filename="{epoch}",
+            monitor="val/X_logp",
+            save_top_k=1,
+            mode="max",
+            every_n_epochs=1,
+        )
         callbacks.append(checkpoint_callback)
 
-    #if cfg.train.ema_decay > 0:
+    # if cfg.train.ema_decay > 0:
     #    ema_callback = utils.EMA(decay=cfg.train.ema_decay)
     #    callbacks.append(ema_callback)
 
     name = cfg.general.name
-    if name == 'test':
-        print("[WARNING]: Run is called 'test' -- it will run in debug mode on 20 batches. ")
-    elif name == 'debug':
+    if name == "test":
+        print(
+            "[WARNING]: Run is called 'test' -- it will run in debug mode on 20 batches. "
+        )
+    elif name == "debug":
         print("[WARNING]: Run is called 'debug' -- it will run with fast_dev_run. ")
     trainer = Trainer(
         gradient_clip_val=cfg.train.clip_grad,
-        accelerator='gpu' if torch.cuda.is_available() and cfg.general.gpus > 0 else 'cpu',
-        devices=cfg.general.gpus if torch.cuda.is_available() and cfg.general.gpus > 0 else None,
-        limit_train_batches=20 if name == 'test' else None,
-        limit_val_batches=20 if name == 'test' else None,
-        limit_test_batches=20 if name == 'test' else None,
+        accelerator="gpu"
+        if torch.cuda.is_available() and cfg.general.gpus > 0
+        else "cpu",
+        devices=cfg.general.gpus
+        if torch.cuda.is_available() and cfg.general.gpus > 0
+        else None,
+        limit_train_batches=20 if name == "test" else None,
+        limit_val_batches=20 if name == "test" else None,
+        limit_test_batches=20 if name == "test" else None,
         val_check_interval=cfg.general.val_check_interval,
         max_epochs=cfg.train.n_epochs,
         check_val_every_n_epoch=cfg.general.check_val_every_n_epochs,
-        fast_dev_run=cfg.general.name == 'debug',
-        strategy='ddp' if cfg.general.gpus > 1 else "auto",
+        fast_dev_run=cfg.general.name == "debug",
+        strategy="ddp" if cfg.general.gpus > 1 else "auto",
         enable_progress_bar=cfg.general.progress_bar,
         overfit_batches=cfg.general.overfit,
         callbacks=callbacks,
-        logger=[]
+        logger=[],
     )
 
     if not cfg.general.test_only:
         try_fit(trainer, model, datamodule, cfg)
-        if cfg.general.name not in ['debug', 'test']:
+        if cfg.general.name not in ["debug", "test"]:
             trainer.test(model, datamodule=datamodule)
     else:
         # Start by evaluating test_only_path
@@ -304,7 +398,7 @@ def main(cfg: DictConfig):
             print("Directory:", directory)
             files_list = os.listdir(directory)
             for file in files_list:
-                if '.ckpt' in file:
+                if ".ckpt" in file:
                     ckpt_path = os.path.join(directory, file)
                     if ckpt_path == cfg.general.test_only:
                         continue
@@ -312,5 +406,5 @@ def main(cfg: DictConfig):
                     trainer.test(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -25,11 +25,12 @@ model:
   model: graph_tf
   diffusion_steps: 1000
   diffusion_noise_schedule: cosine
-  n_layers: 8
-  extra_features: null
+  extra_features: 'cycles' #'all'
+  n_layers: 5 #$8
+  #extra_features: null
   hidden_mlp_dims:
-    X: 128
-    E: 64
+    X: 256
+    E: 128
     'y': 128
   hidden_dims:
     dx: 256
@@ -37,8 +38,8 @@ model:
     dy: 64
     n_head: 8
     dim_ffX: 256
-    dim_ffE: 64
-    dim_ffy: 256
+    dim_ffE: 128
+    dim_ffy: 128
   lambda_train:
   - 5
   - 0

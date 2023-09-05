@@ -9,28 +9,53 @@ import re
 import wandb
 import os
 import sys
+
 try:
     from rdkit import Chem
     from rdkit.Chem import Descriptors as ChemDescriptors
     from rdkit.Chem import RDConfig
 
-    sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+    sys.path.append(os.path.join(RDConfig.RDContribDir, "SA_Score"))
     import sascorer
+
     print("Found rdkit, all good")
 except ModuleNotFoundError as e:
     use_rdkit = False
     from warnings import warn
+
     warn("Didn't find rdkit, this will fail")
     assert use_rdkit, "Didn't find rdkit"
 
 
-allowed_bonds = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3, 'Si': 4, 'P': [3, 5],
-                 'S': 4, 'Cl': 1, 'As': 3, 'Br': 1, 'I': 1, 'Hg': [1, 2], 'Bi': [3, 5], 'Se': [2, 4, 6]}
-bond_dict = [None, Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE, Chem.rdchem.BondType.TRIPLE,
-                 Chem.rdchem.BondType.AROMATIC]
+allowed_bonds = {
+    "H": 1,
+    "C": 4,
+    "N": 3,
+    "O": 2,
+    "F": 1,
+    "B": 3,
+    "Al": 3,
+    "Si": 4,
+    "P": [3, 5],
+    "S": 4,
+    "Cl": 1,
+    "As": 3,
+    "Br": 1,
+    "I": 1,
+    "Hg": [1, 2],
+    "Bi": [3, 5],
+    "Se": [2, 4, 6],
+}
+bond_dict = [
+    None,
+    Chem.rdchem.BondType.SINGLE,
+    Chem.rdchem.BondType.DOUBLE,
+    Chem.rdchem.BondType.TRIPLE,
+    Chem.rdchem.BondType.AROMATIC,
+]
 ATOM_VALENCY = {6: 4, 7: 3, 8: 2, 9: 1, 15: 3, 16: 2, 17: 1, 35: 1, 53: 1}
 
-REPO_NAME = 'FragDiffusion'
+REPO_NAME = "FragDiffusion"
 
 
 def get_repo_dir():
@@ -49,37 +74,47 @@ class BasicMolecularMetrics(object):
 
         self.atom_decoder = None
         if self.dataset_info is not None:
-            self.atom_decoder = getattr(dataset_info, 'atom_decoder', None)
+            self.atom_decoder = getattr(dataset_info, "atom_decoder", None)
 
         # Retrieve dataset smiles only for qm9 currently.
         self.dataset_smiles_list = train_smiles
         self.frag_converter = None
         if is_frag:
-            base_path = get_repo_dir() / 'data'
+            base_path = get_repo_dir() / "data"
             frag_index_file = base_path / FRAG_INDEX_FILE
             frag_edge_file = base_path / FRAG_EDGE_FILE
 
-            self.frag_converter = PyGGraphToMolConverter(frag_index_file, frag_edge_file)
+            self.frag_converter = PyGGraphToMolConverter(
+                frag_index_file, frag_edge_file
+            )
 
     def compute_validity(self, generated, frag_converter=None):
-        """ generated: list of couples (positions, atom_types)"""
+        """generated: list of couples (positions, atom_types)"""
         valid = []
         num_components = []
         all_smiles = []
         for graph in generated:
             atom_types, edge_types = graph
-            mol = build_molecule(atom_types, edge_types, self.atom_decoder, frag_converter)
+            mol = build_molecule(
+                atom_types, edge_types, self.atom_decoder, frag_converter
+            )
 
             smiles = mol2smiles(mol)
             try:
-                mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
+                mol_frags = Chem.rdmolops.GetMolFrags(
+                    mol, asMols=True, sanitizeFrags=True
+                )
                 num_components.append(len(mol_frags))
             except:
                 pass
             if smiles is not None:
                 try:
-                    mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
-                    largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
                     smiles = mol2smiles(largest_mol)
                     valid.append(smiles)
                     all_smiles.append(smiles)
@@ -95,7 +130,7 @@ class BasicMolecularMetrics(object):
         return valid, len(valid) / len(generated), np.array(num_components), all_smiles
 
     def compute_uniqueness(self, valid):
-        """ valid: list of SMILES strings."""
+        """valid: list of SMILES strings."""
         return list(set(valid)), len(set(valid)) / len(valid)
 
     def compute_novelty(self, unique):
@@ -132,9 +167,9 @@ class BasicMolecularMetrics(object):
         return qed_sum / len(generated)
 
     def compute_sa_score(self, valid, generated):
-        '''
-        Synthetic Accessibility 
-        '''
+        """
+        Synthetic Accessibility
+        """
         mols = map(Chem.MolFromSmiles, valid)
         filtered_mols = filter(lambda x: x is not None, mols)
         sa_score_sum = 0.0
@@ -145,11 +180,11 @@ class BasicMolecularMetrics(object):
                 continue
 
         return sa_score_sum / len(generated)
-    
+
     def compute_sc_score(self, valid, generated):
-        '''
+        """
         Synthetic Complexity
-        '''
+        """
         sc_score_sum = 0.0
         for smi in valid:
             try:
@@ -158,18 +193,24 @@ class BasicMolecularMetrics(object):
                 continue
 
         return sc_score_sum / len(generated)
-        
+
     def compute_relaxed_validity(self, generated, frag_converter=None):
         valid = []
         for graph in generated:
             atom_types, edge_types = graph
-            mol = build_molecule_with_partial_charges(atom_types, edge_types, self.atom_decoder, frag_converter)
+            mol = build_molecule_with_partial_charges(
+                atom_types, edge_types, self.atom_decoder, frag_converter
+            )
 
             smiles = mol2smiles(mol)
             if smiles is not None:
                 try:
-                    mol_frags = Chem.rdmolops.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
-                    largest_mol = max(mol_frags, default=mol, key=lambda m: m.GetNumAtoms())
+                    mol_frags = Chem.rdmolops.GetMolFrags(
+                        mol, asMols=True, sanitizeFrags=True
+                    )
+                    largest_mol = max(
+                        mol_frags, default=mol, key=lambda m: m.GetNumAtoms()
+                    )
                     smiles = mol2smiles(largest_mol)
                     valid.append(smiles)
                 except Chem.rdchem.AtomValenceException:
@@ -179,20 +220,30 @@ class BasicMolecularMetrics(object):
         return valid, len(valid) / len(generated)
 
     def evaluate(self, generated):
-        """ generated: list of pairs (positions: n x 3, atom_types: n [int])
-            the positions and atom types should already be masked. """
-        valid, validity, num_components, all_smiles = self.compute_validity(generated, self.frag_converter)
+        """generated: list of pairs (positions: n x 3, atom_types: n [int])
+        the positions and atom types should already be masked."""
+        valid, validity, num_components, all_smiles = self.compute_validity(
+            generated, self.frag_converter
+        )
         nc_mu = num_components.mean() if len(num_components) > 0 else 0
         nc_min = num_components.min() if len(num_components) > 0 else 0
         nc_max = num_components.max() if len(num_components) > 0 else 0
         print(f"Validity over {len(generated)} molecules: {validity * 100 :.2f}%")
-        print(f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}")
+        print(
+            f"Number of connected components of {len(generated)} molecules: min:{nc_min:.2f} mean:{nc_mu:.2f} max:{nc_max:.2f}"
+        )
 
-        relaxed_valid, relaxed_validity = self.compute_relaxed_validity(generated, self.frag_converter)
-        print(f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%")
+        relaxed_valid, relaxed_validity = self.compute_relaxed_validity(
+            generated, self.frag_converter
+        )
+        print(
+            f"Relaxed validity over {len(generated)} molecules: {relaxed_validity * 100 :.2f}%"
+        )
         if relaxed_validity > 0:
             unique, uniqueness = self.compute_uniqueness(relaxed_valid)
-            print(f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%")
+            print(
+                f"Uniqueness over {len(relaxed_valid)} valid molecules: {uniqueness * 100 :.2f}%"
+            )
             logp = self.compute_logp(valid, generated)
             qed = self.compute_qed(valid, generated)
             sascore = self.compute_sa_score(valid, generated)
@@ -200,7 +251,9 @@ class BasicMolecularMetrics(object):
 
             if self.dataset_smiles_list is not None:
                 _, novelty = self.compute_novelty(unique)
-                print(f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%")
+                print(
+                    f"Novelty over {len(unique)} unique valid molecules: {novelty * 100 :.2f}%"
+                )
             else:
                 novelty = -1.0
         else:
@@ -211,8 +264,21 @@ class BasicMolecularMetrics(object):
             unique = []
             sascore = 0.0
             scscore = 0.0
-        return [validity, relaxed_validity, uniqueness, novelty, logp, qed, sascore, scscore], unique,\
-               dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu), all_smiles
+        return (
+            [
+                validity,
+                relaxed_validity,
+                uniqueness,
+                novelty,
+                logp,
+                qed,
+                sascore,
+                scscore,
+            ],
+            unique,
+            dict(nc_min=nc_min, nc_max=nc_max, nc_mu=nc_mu),
+            all_smiles,
+        )
 
 
 def mol2smiles(mol):
@@ -223,7 +289,9 @@ def mol2smiles(mol):
     return Chem.MolToSmiles(mol)
 
 
-def build_molecule(atom_types, edge_types, atom_decoder, frag_converter=None, verbose=False):
+def build_molecule(
+    atom_types, edge_types, atom_decoder, frag_converter=None, verbose=False
+):
     if verbose:
         print("building new molecule")
 
@@ -241,14 +309,25 @@ def build_molecule(atom_types, edge_types, atom_decoder, frag_converter=None, ve
     all_bonds = torch.nonzero(edge_types)
     for i, bond in enumerate(all_bonds):
         if bond[0].item() != bond[1].item():
-            mol.AddBond(bond[0].item(), bond[1].item(), bond_dict[edge_types[bond[0], bond[1]].item()])
+            mol.AddBond(
+                bond[0].item(),
+                bond[1].item(),
+                bond_dict[edge_types[bond[0], bond[1]].item()],
+            )
             if verbose:
-                print("bond added:", bond[0].item(), bond[1].item(), edge_types[bond[0], bond[1]].item(),
-                      bond_dict[edge_types[bond[0], bond[1]].item()] )
+                print(
+                    "bond added:",
+                    bond[0].item(),
+                    bond[1].item(),
+                    edge_types[bond[0], bond[1]].item(),
+                    bond_dict[edge_types[bond[0], bond[1]].item()],
+                )
     return mol
 
 
-def build_molecule_with_partial_charges(atom_types, edge_types, atom_decoder, frag_converter=None, verbose=False):
+def build_molecule_with_partial_charges(
+    atom_types, edge_types, atom_decoder, frag_converter=None, verbose=False
+):
     if verbose:
         print("\nbuilding new molecule")
 
@@ -266,10 +345,19 @@ def build_molecule_with_partial_charges(atom_types, edge_types, atom_decoder, fr
 
     for i, bond in enumerate(all_bonds):
         if bond[0].item() != bond[1].item():
-            mol.AddBond(bond[0].item(), bond[1].item(), bond_dict[edge_types[bond[0], bond[1]].item()])
+            mol.AddBond(
+                bond[0].item(),
+                bond[1].item(),
+                bond_dict[edge_types[bond[0], bond[1]].item()],
+            )
             if verbose:
-                print("bond added:", bond[0].item(), bond[1].item(), edge_types[bond[0], bond[1]].item(),
-                      bond_dict[edge_types[bond[0], bond[1]].item()])
+                print(
+                    "bond added:",
+                    bond[0].item(),
+                    bond[1].item(),
+                    edge_types[bond[0], bond[1]].item(),
+                    bond_dict[edge_types[bond[0], bond[1]].item()],
+                )
             # add formal charge to atom: e.g. [O+], [N+], [S+]
             # not support [O-], [N-], [S-], [NH+] etc.
             flag, atomid_valence = check_valency(mol)
@@ -297,9 +385,9 @@ def check_valency(mol):
         return True, None
     except ValueError as e:
         e = str(e)
-        p = e.find('#')
+        p = e.find("#")
         e_sub = e[p:]
-        atomid_valence = list(map(int, re.findall(r'\d+', e_sub)))
+        atomid_valence = list(map(int, re.findall(r"\d+", e_sub)))
         return False, atomid_valence
 
 
@@ -346,8 +434,10 @@ def valid_mol_can_with_seg(m, largest_connected_comp=True):
     if m is None:
         return None
     sm = Chem.MolToSmiles(m, isomericSmiles=True)
-    if largest_connected_comp and '.' in sm:
-        vsm = [(s, len(s)) for s in sm.split('.')]  # 'C.CC.CCc1ccc(N)cc1CCC=O'.split('.')
+    if largest_connected_comp and "." in sm:
+        vsm = [
+            (s, len(s)) for s in sm.split(".")
+        ]  # 'C.CC.CCc1ccc(N)cc1CCC=O'.split('.')
         vsm.sort(key=lambda tup: tup[1], reverse=True)
         mol = Chem.MolFromSmiles(vsm[0][0])
     else:
@@ -355,8 +445,8 @@ def valid_mol_can_with_seg(m, largest_connected_comp=True):
     return mol
 
 
-if __name__ == '__main__':
-    smiles_mol = 'C1CCC1'
+if __name__ == "__main__":
+    smiles_mol = "C1CCC1"
     print("Smiles mol %s" % smiles_mol)
     chem_mol = Chem.MolFromSmiles(smiles_mol)
     block_mol = Chem.MolToMolBlock(chem_mol)
@@ -366,16 +456,18 @@ if __name__ == '__main__':
 use_rdkit = True
 
 
-def check_stability(atom_types, edge_types, dataset_info, debug=False,atom_decoder=None):
+def check_stability(
+    atom_types, edge_types, dataset_info, debug=False, atom_decoder=None
+):
     if atom_decoder is None:
         atom_decoder = dataset_info.atom_decoder
 
-    n_bonds = np.zeros(len(atom_types), dtype='int')
+    n_bonds = np.zeros(len(atom_types), dtype="int")
 
     for i in range(len(atom_types)):
         for j in range(i + 1, len(atom_types)):
-            n_bonds[i] += abs((edge_types[i, j] + edge_types[j, i])/2)
-            n_bonds[j] += abs((edge_types[i, j] + edge_types[j, i])/2)
+            n_bonds[i] += abs((edge_types[i, j] + edge_types[j, i]) / 2)
+            n_bonds[j] += abs((edge_types[i, j] + edge_types[j, i]) / 2)
     n_stable_bonds = 0
     for atom_type, atom_n_bond in zip(atom_types, n_bonds):
         possible_bonds = allowed_bonds[atom_decoder[atom_type]]
@@ -384,18 +476,32 @@ def check_stability(atom_types, edge_types, dataset_info, debug=False,atom_decod
         else:
             is_stable = atom_n_bond in possible_bonds
         if not is_stable and debug:
-            print("Invalid bonds for molecule %s with %d bonds" % (atom_decoder[atom_type], atom_n_bond))
+            print(
+                "Invalid bonds for molecule %s with %d bonds"
+                % (atom_decoder[atom_type], atom_n_bond)
+            )
         n_stable_bonds += int(is_stable)
 
     molecule_stable = n_stable_bonds == len(atom_types)
     return molecule_stable, n_stable_bonds, len(atom_types)
 
 
-def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, trainer=None, should_check_stability=True, is_frag=False):
-    """ molecule_list: (dict) """
+def compute_molecular_metrics(
+    molecule_list,
+    train_smiles,
+    dataset_info,
+    trainer=None,
+    should_check_stability=True,
+    is_frag=False,
+):
+    """molecule_list: (dict)"""
 
-    if hasattr(dataset_info, 'remove_h') and not dataset_info.remove_h and should_check_stability:
-        print(f'Analyzing molecule stability...')
+    if (
+        hasattr(dataset_info, "remove_h")
+        and not dataset_info.remove_h
+        and should_check_stability
+    ):
+        print(f"Analyzing molecule stability...")
 
         molecule_stable = 0
         nr_stable_bonds = 0
@@ -414,21 +520,30 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, trainer
         # Validity
         fraction_mol_stable = molecule_stable / float(n_molecules)
         fraction_atm_stable = nr_stable_bonds / float(n_atoms)
-        validity_dict = {'mol_stable': fraction_mol_stable, 'atm_stable': fraction_atm_stable}
+        validity_dict = {
+            "mol_stable": fraction_mol_stable,
+            "atm_stable": fraction_atm_stable,
+        }
         if trainer is not None:
             trainer.log_dict(validity_dict)
     else:
-        validity_dict = {'mol_stable': -1, 'atm_stable': -1}
+        validity_dict = {"mol_stable": -1, "atm_stable": -1}
 
     metrics = BasicMolecularMetrics(dataset_info, train_smiles, is_frag)
     rdkit_metrics = metrics.evaluate(molecule_list)
     all_smiles = rdkit_metrics[-1]
-    log_dict = {'Validity': rdkit_metrics[0][0], 'Relaxed Validity': rdkit_metrics[0][1],
-                'Uniqueness': rdkit_metrics[0][2], 'Novelty': rdkit_metrics[0][3],
-                'LogP': rdkit_metrics[0][4], 'QED': rdkit_metrics[0][5],
-                'SA_Score': rdkit_metrics[0][6], 'SCScore': rdkit_metrics[0][7]}
+    log_dict = {
+        "Validity": rdkit_metrics[0][0],
+        "Relaxed Validity": rdkit_metrics[0][1],
+        "Uniqueness": rdkit_metrics[0][2],
+        "Novelty": rdkit_metrics[0][3],
+        "LogP": rdkit_metrics[0][4],
+        "QED": rdkit_metrics[0][5],
+        "SA_Score": rdkit_metrics[0][6],
+        "SCScore": rdkit_metrics[0][7],
+    }
 
-    log_dict = {'samples/%s' % key: val for key, val in log_dict.items()}
+    log_dict = {"samples/%s" % key: val for key, val in log_dict.items()}
 
     if trainer is not None:
         trainer.log_dict(log_dict)

@@ -150,3 +150,6 @@ dgd/analysis/orca/orca
 results/*
 ggg_data/
 ggg_utils/
+checkpoints/
+notebooks/chains/
+notebooks/*.npz

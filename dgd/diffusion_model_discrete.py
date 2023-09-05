@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 import time
 import wandb
 import os
-
+import datamol as dm 
 from dgd.models.transformer_model import GraphTransformer
 from dgd.diffusion.noise_schedule import DiscreteUniformTransition, PredefinedNoiseScheduleDiscrete,\
     MarginalUniformTransition
@@ -13,8 +13,65 @@ from dgd.diffusion import diffusion_utils
 from dgd.metrics.train_metrics import TrainLossDiscrete
 from dgd.metrics.abstract_metrics import SumExceptBatchMetric, SumExceptBatchKL, NLL
 from dgd import utils
-from hydra.utils import instantiate
-from functools import partial
+import pathlib
+
+import torch
+import wandb
+from omegaconf import DictConfig
+from pytorch_lightning import seed_everything
+from loguru import logger
+from dgd import utils
+from dgd.datasets import frag_dataset#, moses_dataset
+from dgd.datasets.frag_dataset import FragDataModule, FragDatasetInfos, FRAG_INDEX_FILE, FRAG_EDGE_FILE
+from dgd.metrics.abstract_metrics import TrainAbstractMetricsDiscrete, TrainAbstractMetrics
+from dgd.metrics.molecular_metrics import SamplingMolecularRDKitMetrics
+from dgd.analysis.visualization import MolecularVisualization, FragmentVisualization, NonMolecularVisualization
+from dgd.diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
+
+def load_excessive_info(cfg: DictConfig):
+    dataset_config = cfg["dataset"]
+    REPO_NAME = 'FragDiffusion'
+    def get_repo_dir():
+        cwd = pathlib.Path.cwd()
+        for parent in cwd.parents:
+            if parent.name == REPO_NAME:
+                return parent
+
+        return cwd
+
+    if 'seed' in cfg.general and cfg.general.seed is not None:
+        seed_everything(cfg.general.seed)
+    datamodule = FragDataModule(cfg)
+
+    dataset_infos = FragDatasetInfos(datamodule, dataset_config)
+    train_metrics = TrainAbstractMetricsDiscrete() if cfg.model.type == 'discrete' else TrainAbstractMetrics()
+    # TODO: Improve accessing file names
+    base_path = get_repo_dir() / 'data'
+    frag_index_file = os.path.join(base_path, FRAG_INDEX_FILE)
+    frag_edge_file = os.path.join(base_path, FRAG_EDGE_FILE)
+    # TODO: Once FragmentVisualization is fixed, switch over
+    visualization_tools = FragmentVisualization(frag_index_file, frag_edge_file, cfg.dataset.remove_h, dataset_infos=dataset_infos)
+    #visualization_tools = NonMolecularVisualization()
+
+    if cfg.model.type == 'discrete' and cfg.model.extra_features is not None:
+        extra_features = ExtraFeatures(cfg.model.extra_features, dataset_info=dataset_infos)
+    else:
+        extra_features = DummyExtraFeatures()
+    domain_features = DummyExtraFeatures()
+
+    dataset_infos.compute_input_output_dims(datamodule=datamodule, extra_features=extra_features,
+                                            domain_features=domain_features)
+
+    sampling_metrics = SamplingMolecularRDKitMetrics(
+        dataset_infos,
+        frag_dataset.get_train_smiles(datamodule.train_dataloader()),
+        is_frag=True
+    )
+
+    return {'dataset_infos': dataset_infos, 'train_metrics': train_metrics,
+                    'sampling_metrics': sampling_metrics, 'visualization_tools': visualization_tools,
+                    'extra_features': extra_features, 'domain_features': domain_features}
+
 
 class DiscreteDenoisingDiffusion(pl.LightningModule):
     def __init__(self, cfg, dataset_infos, train_metrics, sampling_metrics, visualization_tools, extra_features,
@@ -105,6 +162,15 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         self.number_chain_steps = cfg.general.number_chain_steps
         self.best_val_nll = 1e8
         self.val_counter = 0
+
+    @classmethod
+    def from_config(cls, cfg, checkpoint, cuda=False, eval=True):
+        model = cls(cfg, **load_excessive_info(cfg))
+        if eval:
+            model.eval()
+        checkpoint = torch.load(checkpoint, map_location=torch.device('cuda' if cuda else 'cpu'))
+        model.load_state_dict(checkpoint['state_dict'])
+        return model
 
     def training_step(self, data, i):
         dense_data, node_mask = utils.to_dense(data.x, data.edge_index, data.edge_attr, data.batch)
@@ -482,8 +548,33 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         return self.model(X, E, y, node_mask)
 
     @torch.no_grad()
+    def random_sample(self, batch_id=5, batch_size=5, num_nodes=None, return_data=True, sanitize=True):
+        sampled = self.sample_batch(
+                batch_id, batch_size,
+                num_nodes=num_nodes, return_data=return_data,
+                save_final=batch_size, keep_chain=batch_size,
+                number_chain_steps=batch_size
+            )
+        reconstructed_mols=[]
+        for mol in sampled["molecule_list"]:
+            rec_mol=self.visualization_tools.frag_to_mol.node_and_adj_to_mol(*mol)
+            if sanitize:
+                s=dm.to_smiles(rec_mol)
+                s=s.replace("~", "")
+                rec_mol = dm.to_mol(s)
+                if rec_mol is not None:
+                    reconstructed_mols.append(rec_mol)
+            else:
+                reconstructed_mols.append(rec_mol)
+        if sanitize:
+            logger.info(f"Number of valid molecules: {len(reconstructed_mols)/len(sampled['molecule_list'])}")
+    
+        return reconstructed_mols
+
+
+    @torch.no_grad()
     def sample_batch(self, batch_id: int, batch_size: int, keep_chain: int, number_chain_steps: int,
-                     save_final: int, num_nodes=None):
+                     save_final: int, num_nodes=None, return_data=False):
         """
         :param batch_id: int
         :param batch_size: int
@@ -574,7 +665,10 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             edge_types = E[i, :n, :n].cpu()
             predicted_graph_list.append([atom_types, edge_types])
 
-
+        if return_data:
+            return {"node_list":chain_X,
+                    "adjacency_matrix":chain_E,
+                    "molecule_list":molecule_list}
         # Visualize chains
         if self.visualization_tools is not None:
             print('Visualizing chains...')
