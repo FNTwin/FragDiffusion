@@ -1,6 +1,6 @@
 # @package _global_
 general:
-    name : 'new_guacamol'
+    name : 'guacamol_test_run'
     gpus : 1
     wandb: 'online'
     resume: null
@@ -20,7 +20,7 @@ general:
 train:
     optimizer: adam
     n_epochs: 1000
-    batch_size: 256
+    batch_size: 64
     save_model: True
     lr: 2e-4
 model:
@@ -39,3 +39,7 @@ model:
 
   # The dimensions should satisfy dx % n_head == 0
     hidden_dims: {'dx': 256, 'de': 64, 'dy': 128, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 256}
+
+    embedding:
+      target: one_hot # embedding
+

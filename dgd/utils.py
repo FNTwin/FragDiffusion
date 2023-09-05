@@ -68,7 +68,7 @@ class EMA(pl.Callback):
         """
         return pl_module.state_dict()
 
-    @overrides
+    #@overrides
     def on_train_start(self, trainer: "pl.Trainer", pl_module: pl.LightningModule) -> None:
         # Only keep track of EMA weights in rank zero.
         if not self._ema_state_dict_ready and pl_module.global_rank == 0:
@@ -82,7 +82,7 @@ class EMA(pl.Callback):
 
         self._ema_state_dict_ready = True
 
-    @overrides
+    #@overrides
     def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: pl.LightningModule, batch, batch_idx, *args,
                              **kwargs) -> None:
         if self.original_state_dict != {}:
@@ -110,23 +110,23 @@ class EMA(pl.Callback):
             # Remove ema state dict from the memory. In rank 0, it could be in ram pinned memory.
             self.ema_state_dict = {}
 
-    @overrides
+    #@overrides
     def on_validation_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule) -> None:
         if not self._ema_state_dict_ready:
             return  # Skip Lightning sanity validation check if no ema weights has been loaded from a checkpoint.
 
-    @overrides
+    #@overrides
     def on_validation_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         if not self._ema_state_dict_ready:
             return  # Skip Lightning sanity validation check if no ema weights has been loaded from a checkpoint.
 
-    @overrides
+    #@overrides
     def on_save_checkpoint(
             self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", checkpoint: Dict
     ) -> dict:
         return {"ema_state_dict": self.ema_state_dict, "_ema_state_dict_ready": self._ema_state_dict_ready}
 
-    @overrides
+    #@overrides
     def on_load_checkpoint(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", callback_state: Dict):
         self._ema_state_dict_ready = callback_state["_ema_state_dict_ready"]
         self.ema_state_dict = callback_state["ema_state_dict"]

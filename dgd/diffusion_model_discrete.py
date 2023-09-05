@@ -13,7 +13,8 @@ from dgd.diffusion import diffusion_utils
 from dgd.metrics.train_metrics import TrainLossDiscrete
 from dgd.metrics.abstract_metrics import SumExceptBatchMetric, SumExceptBatchKL, NLL
 from dgd import utils
-
+from hydra.utils import instantiate
+from functools import partial
 
 class DiscreteDenoisingDiffusion(pl.LightningModule):
     def __init__(self, cfg, dataset_infos, train_metrics, sampling_metrics, visualization_tools, extra_features,
@@ -24,6 +25,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         output_dims = dataset_infos.output_dims
         nodes_dist = dataset_infos.nodes_dist
 
+        self.embedding = "one_hot" #cfg.embedding.pop("target")
         self.cfg = cfg
         self.name = cfg.general.name
         self.model_dtype = torch.float32
@@ -158,7 +160,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         nll = self.compute_val_loss(pred, noisy_data, dense_data.X, dense_data.E, data.y,  node_mask, test=False)
         return {'loss': nll}
 
-    def validation_epoch_end(self, outs) -> None:
+    def on_validation_epoch_end(self) -> None:
         metrics = [self.val_nll.compute(), self.val_X_kl.compute(), self.val_E_kl.compute(),
                    self.val_y_kl.compute(), self.val_X_logp.compute(), self.val_E_logp.compute(),
                    self.val_y_logp.compute()]
@@ -228,7 +230,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         nll = self.compute_val_loss(pred, noisy_data, dense_data.X, dense_data.E, data.y, node_mask, test=True)
         return {'loss': nll}
 
-    def test_epoch_end(self, outs) -> None:
+    def on_test_epoch_end(self) -> None:
         """ Measure likelihood on a test set and compute stability metrics. """
         metrics = [self.test_nll.compute(), self.test_X_kl.compute(), self.test_E_kl.compute(),
                    self.test_y_kl.compute(), self.test_X_logp.compute(), self.test_E_logp.compute(),
@@ -356,8 +358,13 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
         sampled0 = diffusion_utils.sample_discrete_features(probX=probX0, probE=probE0, node_mask=node_mask)
 
-        X0 = F.one_hot(sampled0.X, num_classes=self.Xdim_output).float()
-        E0 = F.one_hot(sampled0.E, num_classes=self.Edim_output).float()
+        if self.embedding == "one_hot":
+            X0 = F.one_hot(sampled0.X, num_classes=self.Xdim_output).float()
+            E0 = F.one_hot(sampled0.E, num_classes=self.Edim_output).float()
+        else:
+            X0 = F.embedding(sampled0.X, num_classes=self.Xdim_output).float()
+            E0 = F.embedding(sampled0.E, num_classes=self.Edim_output).float()
+
         y0 = sampled0.y
         assert (X.shape == X0.shape) and (E.shape == E0.shape)
 
@@ -411,8 +418,14 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
         sampled_t = diffusion_utils.sample_discrete_features(probX=probX, probE=probE, node_mask=node_mask)
 
-        X_t = F.one_hot(sampled_t.X, num_classes=self.Xdim_output)
-        E_t = F.one_hot(sampled_t.E, num_classes=self.Edim_output)
+
+        if self.embedding == "one_hot":
+            X_t = F.one_hot(sampled_t.X, num_classes=self.Xdim_output)
+            E_t = F.one_hot(sampled_t.E, num_classes=self.Edim_output)
+        else:
+            X_t = F.embedding(sampled_t.X, self.cfg.embedding)
+            E_t = F.embedding(sampled_t.E, self.cfg.embedding)
+
         assert (X.shape == X_t.shape) and (E.shape == E_t.shape)
 
         z_t = utils.PlaceHolder(X=X_t, E=E_t, y=y).type_as(X_t).mask(node_mask)
@@ -640,6 +653,11 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         assert ((prob_E.sum(dim=-1) - 1).abs() < 1e-4).all()
 
         sampled_s = diffusion_utils.sample_discrete_features(prob_X, prob_E, node_mask=node_mask)
+
+        #cfg = self.cfg.embed
+
+        #E_t =
+        #E_t =
 
         X_s = F.one_hot(sampled_s.X, num_classes=self.Xdim_output).float()
         E_s = F.one_hot(sampled_s.E, num_classes=self.Edim_output).float()

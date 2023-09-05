@@ -87,8 +87,9 @@ def get_resume_adaptive(cfg, model_kwargs):
 
 def setup_wandb(cfg):
     config_dict = omegaconf.OmegaConf.to_container(cfg, resolve=True, throw_on_missing=True)
-    kwargs = {'entity': cfg.general.entity, 'name': cfg.general.name, 'project': f'graph_ddm_{cfg.dataset.name}', 'config': config_dict,
-              'settings': wandb.Settings(_disable_stats=True), 'reinit': True, 'mode': cfg.general.wandb}
+    kwargs = {'entity': "fntwin",
+               'name': cfg.general.name, 'project': f'SAFE_SPACE', 'config': config_dict,
+              'settings': wandb.Settings(_disable_stats=False), 'reinit': True, 'mode': cfg.general.wandb}
     wandb.init(**kwargs)
     wandb.save('*.txt')
     return cfg
@@ -264,9 +265,9 @@ def main(cfg: DictConfig):
                                               every_n_epochs=1)
         callbacks.append(checkpoint_callback)
 
-    if cfg.train.ema_decay > 0:
-        ema_callback = utils.EMA(decay=cfg.train.ema_decay)
-        callbacks.append(ema_callback)
+    #if cfg.train.ema_decay > 0:
+    #    ema_callback = utils.EMA(decay=cfg.train.ema_decay)
+    #    callbacks.append(ema_callback)
 
     name = cfg.general.name
     if name == 'test':
@@ -284,7 +285,7 @@ def main(cfg: DictConfig):
         max_epochs=cfg.train.n_epochs,
         check_val_every_n_epoch=cfg.general.check_val_every_n_epochs,
         fast_dev_run=cfg.general.name == 'debug',
-        strategy='ddp' if cfg.general.gpus > 1 else None,
+        strategy='ddp' if cfg.general.gpus > 1 else "auto",
         enable_progress_bar=cfg.general.progress_bar,
         overfit_batches=cfg.general.overfit,
         callbacks=callbacks,

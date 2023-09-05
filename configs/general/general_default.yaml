@@ -1,9 +1,10 @@
 # General settings
-name: 'graph-tf-model'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
+name: 'run_1000dsteps_256batch'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
 wandb: 'online'             # online | offline | disabled
 gpus: 1                     # Multi-gpu is not implemented on this branch
-entity: 'fragdiffusion'
+entity: 'fntwin'
+project: 'SAFE_SPACE'
 
 resume: null            # If resume, path to ckpt file from outputs directory in main directory
 test_only: null         # Use absolute path
@@ -18,7 +19,7 @@ log_every_steps: 50
 number_chain_steps: 50        # Number of frames in each gif
 
 overfit: 0 # Number or ratio of batches to overfit on – e.g. set to 0.01 to overfit on 1%, or set to 1 to overfit on 1 batch
-progress_bar: false
+progress_bar: True
 
 
 final_model_samples_to_generate: 10000

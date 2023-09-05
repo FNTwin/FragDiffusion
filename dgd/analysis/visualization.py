@@ -112,7 +112,7 @@ class MolecularVisualization:
         imgs = [imageio.imread(fn) for fn in save_paths]
         gif_path = os.path.join(os.path.dirname(path), '{}.gif'.format(path.split('/')[-1]))
         imgs.extend([imgs[-1]] * 10)
-        imageio.mimsave(gif_path, imgs, subrectangles=True, fps=5)
+        imageio.mimsave(gif_path, imgs, subrectangles=True, duration=int(1000* 1 / 5))
 
         print(f"Saving {gif_path} to wandb")
         wandb.log({'chain': [wandb.Video(gif_path, caption=gif_path, format="gif")]})
@@ -271,7 +271,7 @@ class NonMolecularVisualization:
         imgs = [imageio.imread(fn) for fn in save_paths]
         gif_path = os.path.join(os.path.dirname(path), '{}.gif'.format(path.split('/')[-1]))
         imgs.extend([imgs[-1]] * 10)
-        imageio.mimsave(gif_path, imgs, subrectangles=True, fps=5)
+        imageio.mimsave(gif_path, imgs, subrectangles=True, duration=int(1000* 1 / 5))
 
         if wandb_prefix and wandb_prefix[-1] != '_':
             wandb_prefix += '_'

@@ -2,29 +2,34 @@ from pathlib import Path
 import os
 import pandas as pd
 import numpy as np
-
+import  gzip
 import torch
 from torch.utils.data import random_split, Dataset
 import torch_geometric.utils
-
+import io 
 from dgd.datasets.abstract_dataset import AbstractDataModule, AbstractDatasetInfos
 
 # TODO: Update
-FRAG_GRAPH_FILE = "zinc/mol_frag_graphs_250k_300_5.pt"
-ATOM_GRAPH_FILE = "zinc/atom_graphs_250k_300_5.pt" #"frag/atom_graphs_100000.pt"
-ATOM_DECODER_FILE = "frag/atom_decoder_250k.csv" #"frag/atom_decoder.csv"
-SMILES_FILE = "frag/valid_smiles_250k.txt"
+FRAG_GRAPH_FILE = "frag/mol_frag_graphs_100000.pt.gz"
+ATOM_GRAPH_FILE = "frag/atom_graphs_100000.pt.gz" #"frag/atom_graphs_100000.pt"
+ATOM_DECODER_FILE = "frag/atom_decoder.csv" #"frag/atom_decoder.csv"
+SMILES_FILE = "frag/valid_smiles_100000.txt"
 FRAG_INDEX_FILE = "frag/fragment_index.csv"
 FRAG_EDGE_FILE = "frag/fragment_edge_index.csv"
 SPLIT_IDX_FILE = "frag/split_idxs.npz"
-
 
 class FragDataset(Dataset):
     def __init__(self, data_file):
         """ This class can be used to load the comm20, sbm and planar datasets. """
         base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir, os.pardir, 'data')
         filename = os.path.join(base_path, data_file)
-        self.graphs = torch.load(filename)
+        try:
+            self.graphs = torch.load(filename)
+        except:
+            with gzip.open(filename, 'rb') as f:
+                # Use an intermediate buffer
+                x = io.BytesIO(f.read())
+                self.graphs =  torch.load(x)
         print(f'Dataset {filename} loaded from file')
 
     def __len__(self):
