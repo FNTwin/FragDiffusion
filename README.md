@@ -67,8 +67,8 @@ of datasets that are currently available
 
 ## Models
 
-| Model  | Config  | Checkpoint  | Regr Conditional  | 
-|---|---|---|---|
-| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | 
-|   |   |   |   |
-|   |   |   |   |
+| Model  | Config  | Checkpoint  | Regr Conditional  | Wandb \
+|---|---|---|---|---|
+| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | [Toy](https://wandb.ai/fntwin/SAFE_SPACE/runs/4wanrsvm?workspace=user-fntwin) |
+|   |   |   |   | |
+|   |   |   |   | |
