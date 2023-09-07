@@ -8,7 +8,27 @@ from overrides import overrides
 from pytorch_lightning.utilities import rank_zero_only
 from torch_geometric.utils import to_dense_adj, to_dense_batch
 import torch
+import wandb
+import hydra
+import omegaconf
+from omegaconf import DictConfig, OmegaConf
 
+def setup_wandb(cfg):
+    config_dict = omegaconf.OmegaConf.to_container(
+        cfg, resolve=True, throw_on_missing=True
+    )
+    kwargs = {
+        "entity": cfg.general.entity,
+        "name": cfg.general.name,
+        "project": cfg.general.project,
+        "config": config_dict,
+        "settings": wandb.Settings(_disable_stats=False),
+        "reinit": True,
+        "mode": cfg.general.wandb,
+    }
+    wandb.init(**kwargs)
+    wandb.save("*.txt")
+    return cfg
 
 def create_folders(args):
     try:

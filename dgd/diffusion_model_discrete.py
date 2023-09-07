@@ -201,13 +201,16 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
     def on_fit_start(self) -> None:
         self.train_iterations = len(self.trainer.datamodule.train_dataloader())
         print("Size of the input features", self.Xdim, self.Edim, self.ydim)
+        if self.local_rank == 0:
+            utils.setup_wandb(self.cfg)
 
     def on_train_epoch_start(self) -> None:
         print("Starting train epoch...")
         self.start_epoch_time = time.time()
         self.train_loss.reset()
         self.train_metrics.reset()
-        wandb.log({"epoch": self.current_epoch}, commit=False)
+        if wandb.run:
+            wandb.log({"epoch": self.current_epoch}, commit=False)
 
     def on_train_epoch_end(self) -> None:
         self.train_loss.log_epoch_metrics(self.current_epoch, self.start_epoch_time)
@@ -236,13 +239,14 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         metrics = [self.val_nll.compute(), self.val_X_kl.compute(), self.val_E_kl.compute(),
                    self.val_y_kl.compute(), self.val_X_logp.compute(), self.val_E_logp.compute(),
                    self.val_y_logp.compute()]
-        wandb.log({"val/epoch_NLL": metrics[0],
-                   "val/X_kl": metrics[1],
-                   "val/E_kl": metrics[2],
-                   "val/y_kl": metrics[3],
-                   "val/X_logp": metrics[4],
-                   "val/E_logp": metrics[5],
-                   "val/y_logp": metrics[6]}, commit=False)
+        if wandb.run:
+            wandb.log({"val/epoch_NLL": metrics[0],
+                       "val/X_kl": metrics[1],
+                       "val/E_kl": metrics[2],
+                       "val/y_kl": metrics[3],
+                       "val/X_logp": metrics[4],
+                       "val/E_logp": metrics[5],
+                       "val/y_logp": metrics[6]}, commit=False)
 
         print(f"Epoch {self.current_epoch}: Val NLL {metrics[0] :.2f} -- Val Atom type KL {metrics[1] :.2f} -- ",
               f"Val Edge type KL: {metrics[2] :.2f} -- Val Global feat. KL {metrics[3] :.2f}\n")
@@ -307,19 +311,21 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         metrics = [self.test_nll.compute(), self.test_X_kl.compute(), self.test_E_kl.compute(),
                    self.test_y_kl.compute(), self.test_X_logp.compute(), self.test_E_logp.compute(),
                    self.test_y_logp.compute()]
-        wandb.log({"test/epoch_NLL": metrics[0],
-                   "test/X_mse": metrics[1],
-                   "test/E_mse": metrics[2],
-                   "test/y_mse": metrics[3],
-                   "test/X_logp": metrics[4],
-                   "test/E_logp": metrics[5],
-                   "test/y_logp": metrics[6]}, commit=False)
+        if wandb.run:
+            wandb.log({"test/epoch_NLL": metrics[0],
+                       "test/X_mse": metrics[1],
+                       "test/E_mse": metrics[2],
+                       "test/y_mse": metrics[3],
+                       "test/X_logp": metrics[4],
+                       "test/E_logp": metrics[5],
+                       "test/y_logp": metrics[6]}, commit=False)
 
         print(f"Epoch {self.current_epoch}: Test NLL {metrics[0] :.2f} -- Test Atom type KL {metrics[1] :.2f} -- ",
               f"Test Edge type KL: {metrics[2] :.2f} -- Test Global feat. KL {metrics[3] :.2f}\n")
 
         test_nll = metrics[0]
-        wandb.log({"test/epoch_NLL": test_nll}, commit=False)
+        if wandb.run:
+            wandb.log({"test/epoch_NLL": test_nll}, commit=False)
 
         print(f'Test loss: {test_nll :.4f}')
 
@@ -539,8 +545,8 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
         # Update NLL metric object and return batch nll
         nll = (self.test_nll if test else self.val_nll)(nlls)        # Average over the batch
-
-        wandb.log({"kl prior": kl_prior.mean(),
+        if wandb.run:
+            wandb.log({"kl prior": kl_prior.mean(),
                    "Estimator loss terms": loss_all_t.mean(),
                    "log_pn": log_pN.mean(),
                    "loss_term_0": loss_term_0,

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 ## Name of your SLURM job
-#SBATCH --job-name=frag_run2
+#SBATCH --job-name=frag_run3
 
 ## Files for logs: here we redirect stoout and sterr to the same file
-#SBATCH --output=out_files/fragdiff.out
-#SBATCH --error=out_files/fragdiff.err
+#SBATCH --output=out_files/fragdiff_all.out
+#SBATCH --error=out_files/fragdiff_all.err
 ## SBATCH --open-mode=append
 
 ## Time limit for the job

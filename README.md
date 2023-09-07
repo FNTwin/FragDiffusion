@@ -76,10 +76,8 @@ of datasets that are currently available
 
 ## Models
 
-| Model  | Config  | Checkpoint  | Regr Conditional  | Wandb \
-|---|---|---|---|---|
-| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | [Toy 1](https://wandb.ai/fntwin/SAFE_SPACE/runs/4wanrsvm?workspace=user-fntwin) |
-| Toy model 2 |   | /home/cristian_valencediscovery_com/dev/FragDiffusion/dgd/expts/outputs/2023-09-05/14-41-22/checkpoints/run_1000dsteps_128batch/epoch=759.ckpt  | dgd/expts/outputs/2023-09-05/14-41-22/.hydra/config.yaml  | [Toy 2](https://wandb.ai/fntwin/SAFE_SPACE/runs/ulpux8qn?workspace=user-fntwin) |
-| Paper Feat ALL  |   |   |   | [All] () |
-| Paper Feat None   |   |   |   | [None] ()|
-| Paper Feat Cycles   |   |   |   | [Cycles] ()|
+| Model  | Config  | Checkpoint  | Regr Conditional  | Wandb | Dataset |
+|---|---|---|---|---| --- |
+| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | [Link](https://wandb.ai/fntwin/SAFE_SPACE/runs/4wanrsvm?workspace=user-fntwin) | Small |
+| Toy model 2 |  dgd/expts/outputs/2023-09-05/14-41-22/.hydra/config.yaml   | /dgd/expts/outputs/2023-09-05/14-41-22/checkpoints/run_1000dsteps_128batch/epoch=759.ckpt  | No |[Link](https://wandb.ai/fntwin/SAFE_SPACE/runs/ulpux8qn?workspace=user-fntwin) | Small |
+| Paper No Extra Feat |dgd/expts/outputs/2023-09-06/10-22-19/.hydra/config.yaml   | dgd/expts/outputs/2023-09-06/10-22-19/checkpoints/Paper_hypers_correct_validity/epoch=209.ckpt  | No  | [Link](https://wandb.ai/fntwin/SAFE_SPACE/runs/gfiugjo3?workspace=user-fntwin)| Small |

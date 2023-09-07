@@ -118,22 +118,7 @@ def get_resume_adaptive(cfg, model_kwargs):
     return new_cfg, model
 
 
-def setup_wandb(cfg):
-    config_dict = omegaconf.OmegaConf.to_container(
-        cfg, resolve=True, throw_on_missing=True
-    )
-    kwargs = {
-        "entity": "fntwin",
-        "name": cfg.general.name,
-        "project": f"SAFE_SPACE",
-        "config": config_dict,
-        "settings": wandb.Settings(_disable_stats=False),
-        "reinit": True,
-        "mode": cfg.general.wandb,
-    }
-    wandb.init(**kwargs)
-    wandb.save("*.txt")
-    return cfg
+
 
 
 def get_repo_dir():
@@ -335,7 +320,7 @@ def main(cfg: DictConfig):
         os.chdir(cfg.general.resume.split("checkpoints")[0])
 
     utils.create_folders(cfg)
-    cfg = setup_wandb(cfg)
+    #cfg = setup_wandb(cfg)
 
     if cfg.model.type == "discrete":
         model = DiscreteDenoisingDiffusion(cfg=cfg, **model_kwargs)

@@ -1,5 +1,5 @@
 # General settings
-name: 'Paper_run_2'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
+name: 'Paper_run_3'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
 wandb: 'online'             # online | offline | disabled
 gpus: 1                     # Multi-gpu is not implemented on this branch
@@ -16,7 +16,7 @@ samples_to_generate: 512       # We advise to set it to 2 x batch_size maximum
 samples_to_save: 20
 chains_to_save: 1
 log_every_steps: 50
-number_chain_steps: 50        # Number of frames in each gif
+number_chain_steps: 25        # Number of frames in each gif
 
 overfit: 0 # Number or ratio of batches to overfit on – e.g. set to 0.01 to overfit on 1%, or set to 1 to overfit on 1 batch
 progress_bar: True
