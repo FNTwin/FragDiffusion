@@ -98,9 +98,13 @@ class BasicMolecularMetrics(object):
             mol = build_molecule(
                 atom_types, edge_types, self.atom_decoder, frag_converter
             )
+            if mol is None:
+                all_smiles.append(None)
+                continue
 
             smiles = mol2smiles(mol)
             try:
+                
                 mol_frags = Chem.rdmolops.GetMolFrags(
                     mol, asMols=True, sanitizeFrags=True
                 )
@@ -201,6 +205,8 @@ class BasicMolecularMetrics(object):
             mol = build_molecule_with_partial_charges(
                 atom_types, edge_types, self.atom_decoder, frag_converter
             )
+            if mol is None:
+                continue
 
             smiles = mol2smiles(mol)
             if smiles is not None:
@@ -323,6 +329,42 @@ def build_molecule(
                     bond_dict[edge_types[bond[0], bond[1]].item()],
                 )
     return mol
+
+def build_molecul_backup(
+    atom_types, edge_types, atom_decoder, frag_converter=None, verbose=False
+):
+    if verbose:
+        print("building new molecule")
+
+    if frag_converter is not None:
+        return frag_converter.node_and_adj_to_mol(atom_types, edge_types)
+
+    mol = Chem.RWMol()
+    for atom in atom_types:
+        a = Chem.Atom(atom_decoder[atom.item()])
+        mol.AddAtom(a)
+        if verbose:
+            print("Atom added: ", atom.item(), atom_decoder[atom.item()])
+
+    edge_types = torch.triu(edge_types)
+    all_bonds = torch.nonzero(edge_types)
+    for i, bond in enumerate(all_bonds):
+        if bond[0].item() != bond[1].item():
+            mol.AddBond(
+                bond[0].item(),
+                bond[1].item(),
+                bond_dict[edge_types[bond[0], bond[1]].item()],
+            )
+            if verbose:
+                print(
+                    "bond added:",
+                    bond[0].item(),
+                    bond[1].item(),
+                    edge_types[bond[0], bond[1]].item(),
+                    bond_dict[edge_types[bond[0], bond[1]].item()],
+                )
+    return mol
+
 
 
 def build_molecule_with_partial_charges(
@@ -528,9 +570,9 @@ def compute_molecular_metrics(
             trainer.log_dict(validity_dict)
     else:
         validity_dict = {"mol_stable": -1, "atm_stable": -1}
-
     metrics = BasicMolecularMetrics(dataset_info, train_smiles, is_frag)
     rdkit_metrics = metrics.evaluate(molecule_list)
+    print(rdkit_metrics[0][4])
     all_smiles = rdkit_metrics[-1]
     log_dict = {
         "Validity": rdkit_metrics[0][0],
@@ -544,6 +586,7 @@ def compute_molecular_metrics(
     }
 
     log_dict = {"samples/%s" % key: val for key, val in log_dict.items()}
+    print(log_dict)
 
     if trainer is not None:
         trainer.log_dict(log_dict)
@@ -552,6 +595,7 @@ def compute_molecular_metrics(
         trainer.log("nc_max", nc["nc_max"], reduce_fx="max")
         trainer.log("nc_mu", nc["nc_mu"], reduce_fx="mean")
     else:
+        #pass
         wandb.log(log_dict)
 
     return validity_dict, rdkit_metrics, all_smiles

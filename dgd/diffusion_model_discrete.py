@@ -164,7 +164,9 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         self.val_counter = 0
 
     @classmethod
-    def from_config(cls, cfg, checkpoint, cuda=False, eval=True):
+    def from_config(cls, cfg, checkpoint, cuda=False, force_offile=True, eval=True):
+        if force_offile:
+            cfg["general"]["wandb"] = "disabled"
         model = cls(cfg, **load_excessive_info(cfg))
         if eval:
             model.eval()
@@ -548,27 +550,22 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         return self.model(X, E, y, node_mask)
 
     @torch.no_grad()
-    def random_sample(self, batch_id=5, batch_size=5, num_nodes=None, return_data=True, sanitize=True):
+    def random_sample(self, batch_id=5, batch_size=5, num_nodes=None, return_data=True, sanitize=True, return_samples=False):
         sampled = self.sample_batch(
                 batch_id, batch_size,
                 num_nodes=num_nodes, return_data=return_data,
                 save_final=batch_size, keep_chain=batch_size,
                 number_chain_steps=batch_size
             )
+        if return_samples:
+            return sampled["molecule_list"]
         reconstructed_mols=[]
         for mol in sampled["molecule_list"]:
-            rec_mol=self.visualization_tools.frag_to_mol.node_and_adj_to_mol(*mol)
-            if sanitize:
-                s=dm.to_smiles(rec_mol)
-                s=s.replace("~", "")
-                rec_mol = dm.to_mol(s)
-                if rec_mol is not None:
-                    reconstructed_mols.append(rec_mol)
-            else:
+            rec_mol=self.visualization_tools.frag_to_mol.node_and_adj_to_mol(*mol, sanitize=sanitize)
+            if rec_mol is not None:
                 reconstructed_mols.append(rec_mol)
         if sanitize:
             logger.info(f"Number of valid molecules: {len(reconstructed_mols)/len(sampled['molecule_list'])}")
-    
         return reconstructed_mols
 
 
@@ -670,29 +667,32 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                     "adjacency_matrix":chain_E,
                     "molecule_list":molecule_list}
         # Visualize chains
-        if self.visualization_tools is not None:
-            print('Visualizing chains...')
-            current_path = os.getcwd()
-            num_molecules = chain_X.size(1)       # number of molecules
-            for i in range(num_molecules):
-                result_path = os.path.join(current_path, f'chains/{self.cfg.general.name}/'
-                                                         f'epoch{self.current_epoch}/'
-                                                         f'chains/molecule_{batch_id + i}')
-                if not os.path.exists(result_path):
-                    os.makedirs(result_path)
-                    _ = self.visualization_tools.visualize_chain(result_path,
-                                                                 chain_X[:, i, :].numpy(),
-                                                                 chain_E[:, i, :].numpy())
-                print('\r{}/{} complete'.format(i+1, num_molecules), end='', flush=True)
-            print('\nVisualizing molecules...')
+        try: #TODO: FIX THIS 
+            if self.visualization_tools is not None:
+                print('Visualizing chains...')
+                current_path = os.getcwd()
+                num_molecules = chain_X.size(1)       # number of molecules
+                for i in range(num_molecules):
+                    result_path = os.path.join(current_path, f'chains/{self.cfg.general.name}/'
+                                                             f'epoch{self.current_epoch}/'
+                                                             f'chains/molecule_{batch_id + i}')
+                    if not os.path.exists(result_path):
+                        os.makedirs(result_path)
+                        _ = self.visualization_tools.visualize_chain(result_path,
+                                                                     chain_X[:, i, :].numpy(),
+                                                                     chain_E[:, i, :].numpy())
+                    print('\r{}/{} complete'.format(i+1, num_molecules), end='', flush=True)
+                print('\nVisualizing molecules...')
 
-            # Visualize the final molecules
-            current_path = os.getcwd()
-            result_path = os.path.join(current_path,
-                                       f'graphs/{self.name}/epoch{self.current_epoch}_b{batch_id}/')
-            self.visualization_tools.visualize(result_path, molecule_list, save_final)
-            self.visualization_tools.visualize(result_path, predicted_graph_list, save_final, log='predicted')
-            print("Done.")
+                # Visualize the final molecules
+                current_path = os.getcwd()
+                result_path = os.path.join(current_path,
+                                           f'graphs/{self.name}/epoch{self.current_epoch}_b{batch_id}/')
+                self.visualization_tools.visualize(result_path, molecule_list, save_final)
+                self.visualization_tools.visualize(result_path, predicted_graph_list, save_final, log='predicted')
+                print("Done.")
+        except:
+            pass
 
         return molecule_list
 

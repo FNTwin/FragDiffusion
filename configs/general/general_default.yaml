@@ -1,5 +1,5 @@
 # General settings
-name: 'run_1000dsteps_256batch'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
+name: 'Paper_extrafeat_all'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
 wandb: 'online'             # online | offline | disabled
 gpus: 1                     # Multi-gpu is not implemented on this branch

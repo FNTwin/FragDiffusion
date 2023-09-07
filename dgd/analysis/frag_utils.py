@@ -105,7 +105,8 @@ class PyGGraphToMolConverter:
         )
 
     def frags_to_mol(
-        self, frag_ids: torch.tensor, edge_index: torch.tensor, edge_ids: torch.tensor
+        self, frag_ids: torch.tensor, edge_index: torch.tensor,
+          edge_ids: torch.tensor
     ) -> rdkit.Chem.rdchem.Mol:
         padding_idx = frag_ids != -1
         if not padding_idx_valid(padding_idx):
@@ -164,7 +165,7 @@ class PyGGraphToMolConverter:
             edge_ids -= 1
         return self.frags_to_mol(frag_ids, edge_index, edge_ids)
 
-    def node_and_adj_to_mol(self, node_list, adjacency_matrix):
+    def node_and_adj_to_mol(self, node_list, adjacency_matrix, sanitize=True):
         """
         node_list: numpy list dimension n
         adjacency_matrix: numpy matrix dimension n x n
@@ -177,7 +178,12 @@ class PyGGraphToMolConverter:
         edge_ids -= 1
         if len(edge_ids.shape) == 0:
             edge_ids = edge_ids.unsqueeze(0)
-        return self.frags_to_mol(node_list, edge_index, edge_ids)
+        mol = self.frags_to_mol(node_list, edge_index, edge_ids)
+        if sanitize:
+            s=dm.to_smiles(mol)
+            s=s.replace("~", "")
+            mol = dm.to_mol(s)
+        return mol
 
     def _get_atom_bond_idxs(
         self, frag_ids: torch.Tensor, edge_index: torch.Tensor, edge_ids: torch.Tensor

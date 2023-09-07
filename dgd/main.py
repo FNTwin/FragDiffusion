@@ -210,6 +210,7 @@ def main(cfg: DictConfig):
 
         dataset_infos = FragDatasetInfos(datamodule, dataset_config)
         train_metrics = (
+            #TrainMolecularMetricsDiscrete(dataset_infos)
             TrainAbstractMetricsDiscrete()
             if cfg.model.type == "discrete"
             else TrainAbstractMetrics()
@@ -306,7 +307,7 @@ def main(cfg: DictConfig):
             train_metrics = TrainMolecularMetricsDiscrete(dataset_infos)
         else:
             train_metrics = TrainMolecularMetrics(dataset_infos)
-
+        # IMPORTANT
         # We do not evaluate novelty during training
         sampling_metrics = SamplingMolecularMetrics(dataset_infos, train_smiles)
         visualization_tools = MolecularVisualization(

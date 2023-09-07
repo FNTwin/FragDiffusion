@@ -9,14 +9,26 @@ paper results, please write to us so that we can investigate the issue.
 
 Warning 3: the conditional generation experiments were implemented with an legacy version of the code. They are not yet available in the public version.
 
+Warning 4: (Cristian) MultiGPU for the fragdiff repo is under development
+
 ## Environment installation
-  - Download anaconda/miniconda if needed
-  - Create a rdkit environment that directly contains rdkit: `conda create -c conda-forge -n my-rdkit-env rdkit`
-  - Install graph-tool (https://graph-tool.skewed.de/)
-  - Install pytorch 1.10 or 1.11 (https://pytorch.org/)
-  - Install pytorch-geometric. Your version should match the pytorch version that is installed (https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html)
-  - Install other packages using the requirement file: `pip install -r requirements.txt`
-  - Install mini-moses: `pip install git+https://github.com/igor-krawczuk/mini-moses@main`
+
+Install it with _mamba_ 🐍
+
+```bash
+# Install the deps
+mamba env create -n  fragdiff -f env.yml
+
+# Activate the environment
+mamba activate fragdiff
+
+# Install the library in dev mode
+pip install -e .
+```
+
+## Run the fragdiff code 
+
+`python3 main.py dataset=frag`
 
 ## Download the data
 
@@ -24,9 +36,6 @@ Warning 3: the conditional generation experiments were implemented with an legac
   - For the community, SBM and planar datasets, data can be found at https://github.com/KarolisMart/SPECTRE/tree/main/data
   - Moses dataset can be found at https://github.com/molecularsets/moses/tree/master/data
   
-
-
-
 
 ## Run the code
   
@@ -69,6 +78,8 @@ of datasets that are currently available
 
 | Model  | Config  | Checkpoint  | Regr Conditional  | Wandb \
 |---|---|---|---|---|
-| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | [Toy](https://wandb.ai/fntwin/SAFE_SPACE/runs/4wanrsvm?workspace=user-fntwin) |
-|   |   |   |   | |
-|   |   |   |   | |
+| Toy model 1 | /checkpoints/toy_models/discrete_toy_model_1/config.yaml | /checkpoints/toy_models/discrete_toy_model_1/discrete_epoch=1234.ckpt | No   | [Toy 1](https://wandb.ai/fntwin/SAFE_SPACE/runs/4wanrsvm?workspace=user-fntwin) |
+| Toy model 2 |   | /home/cristian_valencediscovery_com/dev/FragDiffusion/dgd/expts/outputs/2023-09-05/14-41-22/checkpoints/run_1000dsteps_128batch/epoch=759.ckpt  | dgd/expts/outputs/2023-09-05/14-41-22/.hydra/config.yaml  | [Toy 2](https://wandb.ai/fntwin/SAFE_SPACE/runs/ulpux8qn?workspace=user-fntwin) |
+| Paper Feat ALL  |   |   |   | [All] () |
+| Paper Feat None   |   |   |   | [None] ()|
+| Paper Feat Cycles   |   |   |   | [Cycles] ()|

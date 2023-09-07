@@ -105,7 +105,7 @@ class FragDataModule(AbstractDataModule):
         print("Saving split indices to %s" % cwd)
         np.savez(cwd / "split_idxs", **split_idxs)
 
-        super().prepare_data(datasets)
+        super().prepare_data(datasets) # TODO: one_hot embedding to Embedding
 
 
 class AtomDataModule(AbstractDataModule):

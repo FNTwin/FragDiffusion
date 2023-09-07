@@ -12,7 +12,7 @@ import wandb
 import torch
 from dgd.analysis.frag_utils import PyGGraphToMolConverter
 import matplotlib
-
+from loguru import logger
 # matplotlib.use("macOSX")
 import matplotlib.pyplot as plt
 
@@ -314,6 +314,7 @@ class NonMolecularVisualization:
         self, path, nodes_list, adjacency_matrix, trainer=None, wandb_prefix=""
     ):
         # convert graphs to networkx
+        logger.info(f"Visualizing chain for {nodes_list} and {adjacency_matrix}")
         graphs = [
             self.to_networkx(nodes_list[i], adjacency_matrix[i])
             for i in range(nodes_list.shape[0])
@@ -325,13 +326,14 @@ class NonMolecularVisualization:
         # draw gif
         save_paths = []
         num_frams = nodes_list.shape[0]
-
+        logger.info("Try to visualize chain with number of frames: %s", num_frams)
         for frame in range(num_frams):
             file_name = os.path.join(path, "fram_{}.png".format(frame))
             self.visualize_non_molecule(
                 graph=graphs[frame], pos=final_pos, path=file_name
             )
             save_paths.append(file_name)
+        logger.info("Finihsed visualizing chain")
 
         imgs = [imageio.imread(fn) for fn in save_paths]
         gif_path = os.path.join(
